@@ -1,7 +1,7 @@
 <div align='center'>
  
 # Simplicity Prevails: Rethinking Negative Preference Optimization for LLM Unlearning
-
+[![Venue: NeurIPS 2025](https://img.shields.io/badge/Venue-NeurIPS%202025-green)]()
 [![preprint](https://img.shields.io/badge/arXiv-2410.07163-B31B1B)](https://arxiv.org/abs/2410.07163)
 [![collection](https://img.shields.io/badge/HuggingFace-Collection-yellow)](https://huggingface.co/collections/OPTML-Group/simnpo-unlearned-models-6721751fb02ab0e490ab0017)
 [![issues](https://img.shields.io/badge/Issues-Welcome!-yellow)](https://github.com/OPTML-Group/Unlearn-Simple/issues)
@@ -23,7 +23,7 @@
   </tr>
 </table>
 
-This is the official code repository for the paper [Simplicity Prevails: Rethinking Negative Preference Optimization for LLM Unlearning](https://arxiv.org/abs/2410.07163).
+This is the official code repository for NeurIPS 2025 paper [Simplicity Prevails: Rethinking Negative Preference Optimization for LLM Unlearning](https://arxiv.org/abs/2410.07163).
 
 ## News ## 
 :mega: Check out our [ICML 2025 paper](https://github.com/OPTML-Group/Unlearn-Smooth) on making LLM unlearning more robust through smoothness optimization!
