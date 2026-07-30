@@ -40,3 +40,15 @@ plot/figures/
 
 # chenyliao_add
 # docs/
+
+# secrets
+.env
+.env.*
+
+# synthetic experiment artifacts (generated data / checkpoints / logs)
+synthetic/data/
+synthetic/models/
+synthetic/record/
+synthetic/__pycache__/
+*.pkl
+*.pth

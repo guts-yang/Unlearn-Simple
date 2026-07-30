@@ -4,7 +4,7 @@ import torch.nn as nn
 import random
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from transformers import AdamW
+from torch.optim import AdamW
 from data_generation import load_datasets, prepare_datasets
 from model import TransformerModel
 from evaluate_utils import evaluate_model, evaluate_with_transitions

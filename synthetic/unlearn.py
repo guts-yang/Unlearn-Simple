@@ -4,7 +4,7 @@ import torch.nn as nn
 import random
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from transformers import AdamW
+from torch.optim import AdamW
 from data_generation import load_datasets
 from model import TransformerModel
 from evaluate_utils import evaluate_model, evaluate_with_transitions
@@ -115,7 +115,11 @@ def main(args):
 
 
     ## unlearn loss type
-    loss_type = args.loss_type  
+    loss_type_aliases = {
+        'npo': 'NPO', 'npo_kl': 'NPO_KL', 'npo_rt': 'NPO_RT',
+        'simnpo': 'SimNPO', 'simnpo_kl': 'SimNPO_KL', 'simnpo_rt': 'SimNPO_RT',
+    }
+    loss_type = loss_type_aliases.get(args.loss_type, loss_type_aliases.get(str(args.loss_type).lower(), args.loss_type))
     
     ## create finetuned model
     if loss_type in ['NPO', 'NPO_KL','NPO_RT']:   

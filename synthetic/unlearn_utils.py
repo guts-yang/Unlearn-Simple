@@ -354,6 +354,22 @@ def compute_loss(model, loss_type, X_f, y_f, X_r=None, y_r=None, y_idk=None, fin
     - Computed loss based on the selected loss_type.
     """
 
+    # Accept common casings/aliases (e.g. simnpo -> SimNPO)
+    loss_type_aliases = {
+        'grad_ascent': 'grad_ascent',
+        'grad_descent': 'grad_descent',
+        'grad_diff': 'grad_diff',
+        'grad_diff_kl_forget': 'grad_diff_kl_forget',
+        'kl': 'kl',
+        'npo': 'NPO',
+        'npo_kl': 'NPO_KL',
+        'npo_rt': 'NPO_RT',
+        'simnpo': 'SimNPO',
+        'simnpo_kl': 'SimNPO_KL',
+        'simnpo_rt': 'SimNPO_RT',
+    }
+    loss_type = loss_type_aliases.get(loss_type, loss_type_aliases.get(str(loss_type).lower(), loss_type))
+
     if loss_type == 'grad_ascent':
         return grad_ascent_loss(model, X_f, y_f, state_size)
     elif loss_type == 'grad_descent':
