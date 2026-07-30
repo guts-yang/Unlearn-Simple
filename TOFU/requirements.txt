@@ -1,4 +1,4 @@
-git+https://github.com/huggingface/transformers
+transformers==4.46.3
 datasets
 accelerate
 deepspeed
@@ -15,3 +15,4 @@ packaging
 bitsandbytes
 scipy
 ninja
+scikit-learn

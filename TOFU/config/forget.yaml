@@ -1,5 +1,5 @@
 model_family: llama2-7b
-model_path: paper_models/final_ft_noLORA_5_epochs_inst_lr1e-05_llama2-7b_full_seed42_1/checkpoint-625
+model_path: /root/autodl-tmp/huggingface/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/8fa500e8f345f1dd9cfe95bb4689878c944c9cbd
 
 LoRA:
   r: 0
@@ -29,7 +29,7 @@ overwrite_dir: false
 eval_steps: steps_per_epoch
 warmup_steps: steps_per_epoch
 
-save_dir: ${model_path}/unlearned/6GPU_${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
+save_dir: /root/autodl-tmp/TOFU_results/${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
 
 eval:
   retain_result: data/${..retain_set}_llama_wd0.01/eval_results/ds_size300/eval_log_aggregated.json
