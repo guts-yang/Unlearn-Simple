@@ -10,7 +10,7 @@ forget_type: forget10
 retain_type: retain90
 split: full
 batch_size: 4
-gradient_accumulation_steps: 4
+gradient_accumulation_steps: 6
 num_epochs: 5
 lr: 1e-5
 seed: 42

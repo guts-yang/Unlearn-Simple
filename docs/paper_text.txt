@@ -1,0 +1,1777 @@
+=== PAGE 1 ===
+Simplicity Prevails: Rethinking Negative Preference
+Optimization for LLM Unlearning
+ChongyuFan†,⋆ JianchengLiu†,⋆ LicongLin‡,⋆
+JinghanJia† RuiqiZhang‡ SongMei‡ SijiaLiu†,§
+†MichiganStateUniversity
+‡UniversityofCalifornia,Berkeley
+§IBMResearch
+⋆Equalcontributions
+Abstract
+Thisworkstudiestheproblemoflargelanguagemodel(LLM)unlearning,aim-
+ing to remove unwanted data influences (e.g., copyrighted or harmful content)
+whilepreservingmodelutility. Despitetheincreasingdemandforunlearning,a
+technically-groundedoptimizationframeworkislacking. Gradientascent(GA)-
+type methods, though widely used, are suboptimal as they reverse the learning
+processwithoutcontrollingoptimizationdivergence(i.e.,deviationfromthepre-
+trainedstate),leadingtorisksofmodelcollapse. Negativepreferenceoptimization
+(NPO)hasbeenproposedtoaddressthisissueandisconsideredoneofthestate-
+of-the-artLLMunlearningapproaches. Inthiswork,werevisitNPOandidentify
+anothercriticalissue: referencemodelbias. Thisbiasarisesfromusingtheref-
+erence model (i.e., the model prior to unlearning) to assess unlearning success,
+whichcanleadtoamisleadingimpressionofthetruedata-wiseunlearningeffec-
+tiveness. Specifically,itcouldcause(a)unevenallocationofoptimizationpower
+acrossforgetdatawithvaryingdifficultylevelsand(b)ineffectivegradientweight
+smoothingduringtheearlystagesofunlearningoptimization. Toovercomethese
+challenges,weproposeasimpleyeteffectiveunlearningoptimizationframework,
+calledSimNPO,showingthat‘simplicity’inremovingtherelianceonareference
+model(throughthelensofsimplepreferenceoptimization)benefitsunlearning.
+We provide deeper insights into SimNPO’s advantages, including an analysis
+basedonmixturesofMarkovchains. Extensiveexperimentsfurthervalidateits
+efficacyonbenchmarkslikeTOFU,MUSEandWMDP.Codesareavailableat
+https://github.com/OPTML-Group/Unlearn-Simple.
+1 Introduction
+TherapidadvancementofLLMshasraisedsecurityandsafetyconcerns,includingissuesrelatedto
+copyrightviolationsandsociotechnicalharms[1–4]. However,retrainingthesemodelstoremove
+undesirabledatainfluencesisoftenimpracticalduetothesubstantialcostsandtimerequiredforsuch
+processes. ThisgivesrisetotheproblemofLLMunlearning[5]. Totraceitsorigins,theconceptof
+machineunlearningwasinitiallydevelopedfordataremovaltocomplywithprivacyregulationssuch
+asthe“righttobeforgotten”[6,7],withearlystudiesfocusingonvisionmodels[8–15]. However,it
+issoonadaptedtoLLMstoremoveunwanteddataandknowledge[4,5,16–20].
+ThecurrentoptimizationfoundationforLLMunlearningoftenreliesonoptimizationdivergence1
+from the pre-trained state, which refers to the deviation from the converged pre-trained model
+1Here,weuse“divergence”asopposedto“convergence”inmodeltraining,aimingtoreverselearningfor
+unlearning.
+39thConferenceonNeuralInformationProcessingSystems(NeurIPS2025).
+5202
+tcO
+71
+]LC.sc[
+4v36170.0142:viXra
+
+=== PAGE 2 ===
+UnUnlearn Unlearn Strongly-memorized data
+θRef θNPO θSimNPO 0.5 R N e P t O ra (0 in .0 (1 0 . ) 00)
+SimNPO(0.70)
+Hard 0.0
+sample
+Weakly-memorized data
+Retrain (1.00)
+Easy 0.5 NPO (0.47)
+sample SimNPO (0.70)
+0.0 Unlearn boundary 0 T 1 ruth 2 ratio 3
+ytisneD
+1.00
+0.95
+0.90
+0.85
+0.80
+0.58 0.60 0.62 Model Utility (MU)
+)QF(
+ytilauQ
+tegroF
+100 Retrain
+SimNPO 75
+Better 50
+25
+NPO 0
+40 45 50 KnowMem on r
+kaeLvirP
+NPO
+SimNPO
+Better
+Retrain
+(a)Schematicoverview (b)FQvs.datamemorization (c)TOFU,LLaMA-2-chat7B (d)MUSE,LLaMA-27B
+Figure1: (a)SystematicoverviewofanLLM(θ)post-unlearningusingtheproposedSimNPO,comparedto
+NPO[19]andthereferencemodel.(b)Truthratiodistributionofstrongly-memorizedforgetdatapointsand
+weakly-memorizeddataforNPO,SimNPO,andRetrainontheTOFUForget05dataset[18]underLLaMA-2-
+chat7B;SeeSec.4formoredetails.Asshown,SimNPOachievesbetterforgetquality(FQ,thenumberafter
+method)thanNPOandexhibitsatruthratiodistributionclosertoRetrain.NotethatFQisastatisticalmeasure
+quantifyingtheclosenessbetweenthetruthratiodistributionofanunlearnedmodelandthatofRetrain(with
+FQ=1representingoptimalunlearning).(c)&(d)ExperimenthighlightsonTOFUForget05andMUSENews
+datasets[4]. UnlearningeffectivenessismeasuredbyFQforTOFUandPrivLeakforMUSE,whileutility
+preservationisevaluatedusingmodelutilityforTOFUandKnowMemonretaindataforMUSE(seeTableA1).
+Inbothtasks,Retrainisthegoldstandardforunlearning.
+to reverse the effects of learning the forgotten data, thereby achieving unlearning [18, 19, 21].
+Nevertheless, the lack of control over the divergence rate in unlearning optimization can lead to
+eitherunder-forgetting,whereinsufficientunwanteddatainfluenceisremoved,orover-forgetting,
+causingasignificantlossofmodelutilityinLLMs. Therefore,optimizationforLLMunlearningis
+highlynon-trivial. Negativepreferenceoptimization(NPO)[19]emergesasaneffectiveapproach
+forLLMunlearning,asdemonstratedbyitsbettercontrolofthedivergencerateduringunlearning
+optimizationanditsstrongperformanceincurrentbenchmarkssuchasTOFU[18]andMUSE[4].
+Inspiredbydirectpreferenceoptimization(DPO)[22],ittreatstheforgetdatapointsasnegative
+responses, providing a lower-bounded unlearning objective. This also induces a gradient weight
+smoothingschemetoregulatethespeedofdivergence. WereferreaderstoSec.3fordetails.
+DespitetheadvancementsNPOhasbroughttotheoptimizationfoundationforLLMunlearning,our
+workidentifies,forthefirsttime,itspotentiallimitationsstemmingfromitsrelianceonthereference
+model(i.e.,themodelpriortounlearning)asthebasisforpromotingandregulatingtheoptimization
+divergence. Wetermthisissuereferencemodelbias. Seetheconceptualschematicoverviewbelow.
+Fig.1-(a)illustratesthisissueschematically. NPOaimstowidenthegapbetweentheunlearned
+model(θ )andthereferencemodel(θ ). However, thepredictionconfidenceofθ varies
+NPO ref ref
+acrosssamples, asillustratedbythe“hard”vs. “easy”unlearningexamplesalongthegreenline
+inFig.1-(a). Specifically,“hard”examplesarethosewhosepredictionsunderθ liefarfromthe
+ref
+unlearningdecisionboundary,makingthemmoredifficulttoforget. Incontrast,“easy”examplesare
+alreadyclosetotheboundary,wherefurtherincreasingthegapbetweentheunlearnedmodeland
+θ couldbecomeunnecessary. Yet,NPOmayblindlyincreasethedeviationfromθ (asshownby
+ref ref
+thebluelineinFig.1-(a)),causing“easy”examplestomoveunnecessarilyfarbeyondtheunlearning
+boundary. Meanwhile,“hard”examplesremainfarfromtheboundaryandrequiremoretargetedeffort
+toforget. Inotherwords,relyingonthereferencemodelcanresultinsuboptimalunlearningpower
+allocationduetoitsuniform,deviation-basedstrategy.
+Throughoutthiswork,weask:
+(Q)HowcanweidentifyandaddressthelimitationsofNPOtoenhanceitseffectiveness?
+Inresponseto(Q),weproposeasimpleyeteffectiveunlearningoptimizationframework,termed
+SimNPO, demonstrating that properly removing reliance on a reference model can significantly
+enhanceunlearning. Thisapproachalsodrawsinspirationfromsimplepreferenceoptimizationin
+LLMalignment[23].Additionally,wewillprovidedetailedinsightsintohowSimNPOovercomesthe
+limitationsofNPOcausedbyreferencemodelbias. AsshownschematicallyinFig.1-(a),SimNPO
+outperformsNPObymoreaccuratelyidentifyingthedifficultyofunlearningdata(i.e.,hardvs. easy
+samples)andallocatingoptimizationpowermoreeffectivelyacrossdifferentforgetsamples. Fig.1-
+(b)providesexperimentalevidence,whichwillbeprovidedinSec.4,bycomparingtheunlearning
+performanceofNPOandSimNPOacrossforgetdatapointswiththeirunlearningdifficultylevels
+indicated by their memorization levels. The rationale is that the reference model demonstrates
+varyinglevelsofmemorizationacrossdifferentforgetsamples,makingstrongly-memorizedsamples
+2
+
+=== PAGE 3 ===
+harder tounlearnandweakly-memorized sampleseasier tounlearn. However,NPOmayblindly
+over-allocateunlearningpowertotheseeasiersamples,therebyhinderingtheeffectiveunlearning
+ofharderones. ThisexplainswhyFig.1-(b)showsthatNPOperformsworsethanSimNPOinthe
+strongly-memorized(hard)forgetdata,asevidencedbyagreaterdeviationfromRetrain.
+Insummary,ourscontributionsareoutlinedbelow:
+•WerevisittheNPOframeworkandidentifyitspotentialweakness–referencemodelbias–inLLM
+unlearning,whichcanleadtoissuessuchassensitivitytothereferencemodel’sresponsequality
+and ineffective gradient weight smoothing. We reveal and justify this bias through a series of
+analyses/examples,includingreferencemodelperturbation,therelationshipbetweenunlearningand
+datamemorization,andtheimpactofforgetdatalengthonunlearning.
+•BuildingoninsightsintoNPO’slimitations,weproposeanimprovedLLMunlearningapproach,
+SimNPO,whichextendsNPOusingareference-freeoptimizationframework,simplepreference
+optimization [23]. Despite its simplicity, our methodology is grounded in a rigorous technical
+rationale,assupportedbyadditionalsyntheticstudiesandtheoreticalinsights.
+•WeconductextensiveexperimentstodemonstratetheimprovementsofSimNPOoverNPOacross
+variousscenarios,includingTOFU[18],MUSE[4],WMDP[3],anddefendingagainstrelearning-
+basedattacks[24,25]. SomeexperimenthighlightsonTOFUandMUSEunlearningbenchmark
+datasetsareshowcasedinFig.1-(c,d).
+2 Relatedwork
+Machine unlearning. From the perspective of whether the forget data can be inferred from the
+unlearnedmodelintermsofmembership(i.e.,adataprivacyviewpoint),thewidelyadoptedgold
+standardformachineunlearningis‘Retrain’[8,11,13], whichwealsoadoptinthiswork. Also
+knownasexactunlearning,thisapproachretrainsthemodelfromscratchontheoriginaltraining
+setwiththeforgetdataexcluded. However,exactunlearningischallenginginpracticeduetothe
+assumptionforaccesstothefulltrainingsetandthehighcomputationalcostofretraining. Toaddress
+thesechallenges,variousapproximateunlearningmethodshavebeendeveloped[10,26,27]. These
+approachestypicallyinvolvemodelfine-tuningorediting,appliedtothepre-trainedmodel,based
+on the unlearning request. Their effectiveness has been shown in different application domains,
+including image classification [12, 13, 28, 29], image generation [14, 15, 30], federated learning
+[31–33],andgraphneuralnetworks[34–36].
+LLMunlearning. TherehasalsobeenagrowingbodyofresearchfocusingonLLMunlearning
+[3,5,16–20,37–49],aimingtoeffectivelyremoveundesireddatainfluencesand/ormodelbehaviors
+whilepreservingtheutilityforunrelatedknowledgegeneration,andmaintainingefficiencywithoutthe
+needforretraining. ApplicationsofunlearninginLLMsarediverse,fromsafeguardingcopyrighted
+andpersonallyidentifiableinformation[16,38,50],topreventingLLMsfromcreatingcyberattacks
+or bioweapons [3, 51], and reducing the production of offensive, biased, or misleading content
+[17,37,52].Currentunlearningapproachesincludemodeloptimization-basedmethods[3,16,17,19–
+21, 47–49, 53] and input prompt or in-context learning-based techniques [41, 44, 45]. However,
+manylackeffectiveness,leadingtoeitherunder-forgettingorover-forgetting,asshownbyrecent
+LLMunlearningbenchmarkssuchasTOFUforfictitiousunlearning[18]andMUSEforprivateor
+copyrightedinformationremoval[4]. Recentstudiesalsoshowthatevenafterunlearning,modelscan
+remainvulnerabletoadversarialattacks[24,54,55]orrelearningfromasmallnumberofforgetdata
+[24,25]. ThisevidencesuggeststhateffectiveunlearningforLLMsisfarfromtrivial. Amongcurrent
+efforts,NPO(negativepreferenceoptimization)[19]standsoutasapromisingmethod. However,we
+willshowthattheadvantagesofNPOcanbelimitedbythepresenceofreferencemodelbias(Sec.4).
+Preferenceoptimization. Inthiswork,weadvanceLLMunlearningthroughthelensofpreference
+optimization. This is motivated by aligning LLMs with human values, known as reinforcement
+learningfromhumanfeedback(RLHF)[56–58]. However,onlinepreferenceoptimizationalgorithms
+are often complex and challenging to optimize [59, 60], driving interest in more efficient offline
+alternatives.Directpreferenceoptimization(DPO)[22]introducedanofflineapproachthateliminates
+the need for a reward model, sparking the development of several reward-free offline preference
+objectives[23,61–65]. NotablemethodsincludeRRHF[65],SLic-HF[61],IPO[62],KTO[64],
+ORPO[63],andSimPO[23]. Amongthesemethods,SimPOisareference-free,length-normalized
+3
+
+=== PAGE 4 ===
+variantofDPO,andwewilldemonstratethatitiswell-suitedforintegratingintoLLMunlearning
+andimprovingNPO.
+3 APrimeronLLMUnlearning
+Problemformulation. Unlearningtaskscantakevariousformsandaretypicallyassociatedwith
+aspecificsetofdatapointstoberemoved,knownastheforgetset(D ). Thesetasksoftenrequire
+f
+acomplementarysetofnon-forgottendatapoints,knownastheretainset(D ),topreservemodel
+r
+utilitybypenalizingthedivergencecausedbyunlearning.Asaresult,theproblemofLLMunlearning
+canbecastasaregularizedoptimizationproblemthatbalancestheforgetandretainobjectives[5,19]:
+mini
+θ
+mize E (x,y)∈Df [ℓ f (y|x;θ)]+λE (x,y)∈Dr [ℓ r (y|x;θ)], (1)
+whereθrepresentsthemodelparameterstobeupdatedduringunlearning,λ≥0isaregularization
+parametertopenalizethe‘divergence’ofunlearning,andℓ andℓ representforgetandretainlosses
+f r
+incurredwhenusingmodelparametersθtogenerateygiventheinputx.
+Substantial research has focused on designing and analyzing appropriate forget and retain loss
+functions to solve problem (1) [4, 5, 16–20]. For instance, let π (y|x) represent the prediction
+θ
+probabilityofthemodelθgiventheinput-responsepair(x,y). Theretainlossistypicallychosenas
+thecross-entropy-basedsequencepredictionloss,ℓ (y|x,θ)=−logπ (y|x),whoseminimization
+r θ
+encourages the model to perform well on the retain data (x,y) ∈ D . In (1), if we specify the
+r
+forgetlossasthenegativetokenpredictionlossℓ (y|x,θ)=logπ (y|x),whoseminimizationthen
+f θ
+discouragesthemodelfromlearningtheforgetdata(x,y)∈D . Minimizingsuchaforgetlossis
+f
+knownasthegradientascent(GA)method[11,18]. Similarly,minimizingtheregularizedlossthat
+integratesGAwiththeretainlossisknownasthegradientdifference(GradDiff)method[17,18,21].
+Negativepreferenceoptimization(NPO).Apopularoptimizationframeworkforsolvingproblem
+(1) is NPO [19]. It treats the forget data as negative examples in DPO [22], transforming the
+unboundedGA-basedforgetlossintoa①boundedlossfrombelow,whichhelpspreventcatastrophic
+collapse,andan②adaptiveweightsmoothingappliedtotheforgetlossgradients,enablingmore
+controlleddivergencespeedinunlearning.
+ThesebenefitscanbeclearlyseenfromtheNPOlossanditsgradientasfollows:
+(cid:20) (cid:18) (cid:18) (cid:19)(cid:19)(cid:21)
+2 π (y|x)
+ℓ (θ)=E − logσ −βlog θ (2)
+NPO (x,y)∈Df β π (y|x)
+ref
+(cid:124) (cid:123)(cid:122) (cid:125)
+①:=ℓf(y|x;θ),thespecifiedforgetlossin(1)
+ 
+(cid:18) 2π (y|x)β (cid:19) 
+∇ ℓ (θ)=E  θ ·∇ logπ (y|x) (3)
+θ NPO (x,y)∈Df π (y|x)β+π (y|x)β θ θ 
+ θ ref (cid:124) (cid:123)(cid:122) (cid:125)
+(cid:124) (cid:123)(cid:122) (cid:125) GA
+②:=wθ(x,y),adaptiveweight
+whereσ(t)=1/(1+e−t)isthesigmoidfunction,β >0isthetemperatureparameterandπ is
+ref
+thereferencemodelgivenbytheinitialmodelpriortounlearning. Additionalinsightsinto①-②are
+givenbelow.
+① From (2), the NPO-type forget loss is bounded below by 0, i.e., ℓ (y|x;θ) ≥ 0, whereas the
+f
+GA-typeforgetloss,ℓ (y|x,θ)=logπ (y|x),hasnolowerbound. Moreover,minimizingittowards
+f θ
+ℓ (y|x;θ)→0drivesthepredictionprobabilityπ (y|x)todecrease,wideningthegapbetweenthe
+f θ
+predictionprobabilityandthereferencemodelontheforgetset,i.e.,π (y|x)≪π (y|x).
+θ ref
+②Asseenin(3),theadaptiveweightw (x,y)istypicallylessthan1sinceπ (y|x)<π (y|x)for
+θ θ ref
+forgetting. Consequently,NPO’sgradientyieldsamorecontrolledandgradualdivergencespeed(i.e.,
+deviationfromthereferencemodel),comparedtoGA(withw (x,y)=1).
+θ
+Inthispaper,NPOwillserveastheprimarybaselineforLLMunlearning. Itsimplementationfollows
+theregularizedoptimizationin(1),wheretheforgetlossℓ isdefinedasin(2)andtheretainlossℓ
+f r
+isthetokenpredictionlossℓ (y|x,θ)=−logπ (y|x)appliedtotheretainset.
+r θ
+LLMunlearningtasksandevaluations. GiventhattheassessmentofLLMunlearningmayrelyon
+specifictasks,wenextintroducetheunlearningtasksandevaluationmetricsthatthisworkcovers. (1)
+TOFU[18]considersfictitiousunlearningonasyntheticQ&Adataset. (2)MUSE[4]isdesigned
+4
+
+=== PAGE 5 ===
+to remove verbatim or knowledge memorization from News and Books datasets, including both
+verbatimtextsandknowledgesetsforunlearningevaluation. (3)WMDP[3]aimstopreventLLMs
+fromgeneratinghazardouscontentindomainssuchasbiology,cybersecurity,andchemistry. Despite
+thedifferencesinevaluationmetricsacrosstheabovetasks,theassessmentbroadlyfallsintotwo
+categories. (1)Unlearningeffectivenessmeasureshowfaithfullyundesireddatainfluencesormodel
+capabilitiesareremoved. Forexample, itisassessedbytheforgetquality(FQ)metricinTOFU,
+whichusesap-valuetotesttheindistinguishabilitybetweenthepost-unlearningmodelandamodel
+retrainedontheretainsetonly,andbyprivacyleakage(PrivLeak)inMUSE,whichmeasuresthe
+likelihoodofdetectingthatthemodelwasevertrainedontheforgetset. (2)Utilitypreservation
+evaluatesthepost-unlearningperformanceonstandardutilitytasks. SeeTableA1inAppendixAfor
+asummaryoftheunlearningtasksandevaluationmetrics.
+4 UncoveringReferenceModelBiasinNPO
+Inthissection,wehighlightakeyweaknessofNPO,whichweterm‘referencemodelbias’: The
+incorporation of the reference model in NPO biases the unlearning objective towards enlarging
+the distance relative to this reference model. As noted in (2), minimizing the NPO loss drives
+π (y|x)≪π (y|x). However,usingπ asthebasisforNPO’sunlearningcriterioncanintroduce
+θ ref ref
+negativeeffects(L1)–(L2),whichwewilldetaillater.
+Beforethat,wepresentawarm-upstudytoillustrateNPO’ssensitivitytothechoiceofthereference
+model(θ ,usedinterchangeablywithπ ). Specifically,weconstructaperturbedreferencemodel,
+ref ref
+θ′ ,byaveragingtheoriginalreferencemodelθ witharandomlyweightedmodel,whoseweights
+ref ref
+aredrawnfromastandardGaussiandistributionwithzeromeanandvariance. WethenapplyNPO
+usingθ′ asthereferenceontheTOFUForget05dataset,followingthesamesetupasinFig.1-(c).
+ref
+Wefindthatthereexistsasubstantialdropinforgetquality–from0.79(withθ )to0.27(withθ′ ),
+ref ref
+whilethemodelutilityremainsnearlyunchanged(0.52w/θ′ vs. 0.57w/θ ). Wereferreadersto
+ref ref
+Fig.A1inAppendixBforthedetailedcomparison. Thispreliminarystudyhighlightsthecritical
+influenceofthereferencemodelonNPO’sunlearningeffectiveness. Thus,adeeperinvestigationinto
+theuseofthereferencemodelcouldoffervaluableinsightsforimprovingtheunlearningoptimization
+framework.
+Next,weelaborateonthelimitations(L1)–(L2)introducedbythereferencemodelinNPO.
+(L1)Challengeofunevenallocationofunlearningpoweracrossforgetdata. Atfirstglance,
+drivingtheunlearnedmodeltodeviatefromthereferencemodelinNPO,i.e.,promotingπ (y|x)≪
+θ
+π (y|x), seems desirable for unlearning on the forget set. However, the over-reliance on π
+ref ref
+canovershadowthetruesample-specificunlearningdifficulty,leadingtoanunevenallocationof
+unlearningpower. Weelaborateonthisissuethroughtwoexamples.
+Top 50% short-length data
+Retrain(1.00)
+0.5 NPO(0.58)
+SimNPO(0.91)
+0.0
+Other 50% longer-length data
+Retrain(1.00)
+0.5 NPO(0.81)
+SimNPO(0.97)
+0.0
+0 1 2 3
+Truth ratio
+ytisneD
+(Example1: Unlearningstronglyvs. weakly-memorizedforgetdata.) We
+firstexplain(L1)fromtheperspectiveofunlearningvs. datamemoriza-
+tion. Considertwoforgetsets,D andD ,whereD ismorestrongly
+f,1 f,2 f,1
+memorizedbythemodelthanD . Tosupportthesememorizationlev-
+f,2
+els,weprovidedetailedexperimentalsettingsinAppendixC.Withthis
+setup,thepredictionlossonD issmaller,leadingtoahigherprediction
+f,1
+probabilityπ . Accordingly,theNPOgradientsmoothingtermin(3)
+ref
+becomessmallerforD ,meaningNPOallocateslessfirst-orderopti-
+f,1 Figure2: Truthratiodis-
+mizationpowertoit. However,D ,beingstronglymemorized,should
+f,1 tribution of short/long for-
+ideally receive more unlearning power. As a result, this uneven focus
+getdataforNPO,SimNPO,
+hindersNPO’sabilitytoeffectivelyforgetD ,potentiallycausingunder-
+f,1 and Retrain on TOFU For-
+unlearningandreducingtheFQofD f,1 tonearlyzero. SeeFig.1-(b)and get05.Thefigureformatfol-
+TableA2forresults. lowsFig.1-(b).
+(Example 2: Unlearning short vs. long-response data.) In this example, we evaluate unlearning
+performanceacrossdifferenttypesofforgetdata,categorizedbytheirresponselengths(i.e.,short
+vs. long). Themotivationstemsfromtheobservationthatthereferencemodelmayexhibitabias
+towardgeneratinglonger,yetlower-quality,responses[23]. Fig.2showsthatNPOexhibitsagreater
+distancefromRetrainwhenunlearningthetop50%shortest-lengthforgetdata,resultinginalower
+FQ(forgetquality)of0.58. Incontrast,NPOperformsbetterunlearningforthelonger50%ofthe
+5
+
+=== PAGE 6 ===
+forgetset,yieldingahigherFQof0.81. TheineffectivenessofNPOinunlearningforgetdatawith
+shortresponseswillbefurtheranalyzedthroughthelensofamixtureofMarkovchainsinSec.5.
+Retrain NPO SimNPO
+1.00 0.99
+0.98
+0.97
+0.96
+0.95
+20 40 60 80
+Response Length |y|
+w
+s'OPN
+100 101
+102
+103
+104
+105
+106
+1 2 3 5 7 10
+Unlearn Epoch
+w
+s'OPN
+    NPO
+   
+   
+            
+ 8 Q O H D U Q  ( S R F K
+ \ W L O D X 4  W H J U R )    
+   
+            
+ 8 Q O H D U Q  ( S R F K
+ \ W L O L W 8  O H G R 0
+(a)wθofNPOatepoch1 (b)Trajectoryofwθvs.epochs (c)Forgetqualityvs.epochs (d)Modelutilityvs.epochs
+Figure3: Experimentalevidenceofineffectiveweightsmoothingandutility-dropforNPOonTOFUForget05
+(a)NPO’sgradientweights(w )atepoch1vs.responselength|y|.(b)Trajectoryofw forNPOoverunlearning
+θ θ
+epochs,whereboxplotrepresentsthedistributionofgradientweightsoverforgetsamples.(c)-(d)Forgetquality
+andmodelutilityofNPOvs.epochs.
+(L2)Lackofgradientweightsmoothingintheearlystagesofunlearning. Anotherissueintro-
+ducedbythereferencemodelπ concernstheeffectivenessofNPO’sgradientweightsmoothing,
+ref
+i.e.,w (x,y)=(2π (y|x)β)/(π (y|x)β +π (y|x)β)in(3). Duringtheearlyoptimizationstage
+θ θ θ ref
+ofNPO,wefindw (x,y)≈1regardlessofthevaryingdata-specificunlearningdifficultiessince
+θ
+the initialization of the unlearned model θ is given by the reference model. Fig.3-(a,b) support
+thisfindingbydisplayingthegradientsmoothingweightsofNPOatepochoneforforgetdatawith
+varyingresponselengths(Fig.3a),asanalyzedinExample2,andtheirtrajectoryoverthecourseof
+unlearningepochs(Fig.3b). Asshown,thegradientsmoothingweightsofNPOshowlargevariance,
+butmostvaluesareconcentratedaroundw (x,y)≈1atepochone. ThisimpliesthatNPObehaves
+θ
+similarlytoGAintheearlystageofunlearning,potentiallycausingalargeutilitydropevenifthe
+weightdecreasesinlateroptimization. Fig.3-(c,d)justifytheabovebypresentingFQandmodel
+utilityofNPOonTOFUagainstunlearningepochs. Asshown,NPOtendstocausealargerutility
+dropatearlyepochscomparedtoSimNPO,theimprovedalternativetoNPOinSec.5.
+5 SimNPO:MethodandRationale
+Motivation of SimNPO and its forget objective. The simplest solution to mitigating NPO’s
+referencemodelbiasistodirectlyremoveπ fromthegradientin(3),settingπ =0. However,
+ref ref
+thisvariantwouldbeineffective,asthereference-freegradientreducestoGA,withw (x,y)=1.
+θ
+This negates NPO’s advantages. To develop a better solution for improving NPO, we revisit the
+contextofpreferenceoptimizationandinvestigatewhetherthereferencemodelcanbeexcludedwhile
+stillretainingtheunlearningbenefitsprovidedbyNPO.OurideaparallelshowNPOwasoriginally
+inspiredbyDPO[22]. WeadoptSimPO[23],areference-freealternativetoDPO,astheoptimization
+frameworkforunlearning,leadingtotheSimNPO(simpleNPO)method.
+ThekeydifferencebetweenSimPOandDPOliesintheirrewardformulationforpreferenceopti-
+mization. In DPO, the reward formulation is given by the comparison with the reference model,
+i.e., βlog(π (y|x)/π (y|x)). This formulation was used by NPO. In contrast, SimPO takes a
+θ ref
+reference-freebutlength-normalizedrewardformulation: (β/|y|)logπ (y|x),where|y|denotesthe
+θ
+responselength.
+TakingtheinspirationofSimPO,wecanmitigatethereferencemodelbiasinNPObyreplacing
+itsrewardformulationβlog(π (y|x)/π (y|x))in(2)withtheSimPO-basedrewardformulation
+θ ref
+(β/|y|)log(π (y|x)). Thismodificationtransforms(2)intotheSimNPOloss:
+θ
+(cid:20) (cid:18) (cid:19)(cid:21)
+2 β
+ℓ (θ)=E − logσ − logπ (y|x)−γ (4)
+SimNPO (x,y)∈Df β |y| θ
+whereγ ≥ 0istherewardmarginparameter,inheritedfromSimPO,whichdefinesthemarginof
+preferenceforadesiredresponseoveradispreferredone. However,unlessotherwisespecified,we
+set γ = 0 to align with the NPO loss (2). This is also desired because γ introduces a margin to
+thepredictionloss−(β/|y|)logπ (y|x). Consequently,alargerγ requiresgreatercompensationto
+θ
+furthersuppresstokenprediction,enforcingastricterunlearningcondition. Thiscanacceleratethe
+utilitydropduringunlearning. SeeFig.A2ofAppendixDfortheablationstudyofhyperparameters.
+TheSimNPOloss(4),whenintegratedin(1),formstheSimNPOmethod.
+6
+
+=== PAGE 7 ===
+InsightsintoSimNPO:AddressingNPO’slimitationsonebyone. SimilartoNPO,theSimNPO
+loss (4) is bounded from below, with a minimum value of 0. Approaching this minimum drives
+theunlearning. However,thekeydistinctionofSimNPOfromNPOisitsforgetdata-aware,length-
+normalized reward formulation, (β/|y|)logπ (y|x) in (4). This results in an improved gradient
+θ
+smoothingscheme. Specifically,thegradientoftheSimNPOloss(withγ =0)yields:
+2(π (y|x))β/|y| 1
+∇ ℓ (θ)=E [ θ · ·∇ logπ (y|x)]. (5)
+θ SimNPO (x,y)∈Df 1+(π (y|x))β/|y| |y| θ θ
+θ
+(cid:124) (cid:123)(cid:122) (cid:125)
+:=wθ ′(x,y)
+SeeAppendixEforderivation. SimilartoNPOin(3),thegradientin(5)canbedividedintotwo
+components: weightsmoothing(w′)andGA.However,inSimNPO,theweightsmoothingisno
+θ
+longerinfluencedbythereferencemodelandisinsteadnormalizedbythelength|y|. Thisintroduces
+twokeyadvantages(a)-(b)below,inresponsetoNPO’slimitations(L1)-(L2).
+(a)SimNPOleveragesthe(data-specific)responselengthasaguideforunlearningpowerallocation.
+Forinstance, when|y|islarge, lessoptimizationpowerisallocated, helpingtoavoidtheuneven
+unlearning power allocation across forget data with varying response lengths, as exemplified in
+Fig.2. In the extreme case where β → 0, the SimNPO’s gradient reduces to a weighted GA:
+∇ ℓ (θ)→E [1/|y|∇ logπ (y|x)].ThisisdifferentfromNPO,whichbecomesGA
+θ SimNPO (x,y)∈Df θ θ
+asβ →0. Fig.A3inAppendixFempiricallydemonstratestheadvantageoflengthnormalizationin
+SimNPOforunlearning. Asshown,SimNPOoutperformsNPOinbothforgetqualityandmodel
+utility,comingclosesttoRetrain. Eveninthespecialcasewhereβ =0(i.e.,Weighted-GradDiff),
+thelengthnormalizationprovidesbenefitsoverGradDiff.
+ ( S R F K    R I  6 L P 1 3 2  ( S R F K    R I  6 L P 1 3 2  ( S R F K    R I  6 L P 1 3 2  ( S R F K     R I  6 L P 1 3 2
+      3 H D U V R Q         3 H D U V R Q         3 H D U V R Q               3 H D U V R Q       
+            
+    
+             
+                                   
+ ( S R F K    R I  1 3 2  ( S R F K    R I  1 3 2  ( S R F K    R I  1 3 2  ( S R F K     R I  1 3 2
+      3 H D U V R Q           3 H D U V R Q         3 H D U V R Q              3 H D U V R Q       
+    
+                
+                                   
+0w  V 
+ 2 3 1 P L 6
+w  V 
+ 2 3 1
+ 5 H V S R Q V H  / H Q J W K |y|
+Figure4: GradientweightsmoothingofNPO(w )andSimNPO(w′)vs. forgetdataresponselength|y|
+θ θ
+acrossdifferentepochs(1,2,3,and10)onTOFUForget05.ThePearsoncorrelationintheupperrightcorner
+indicatestherelationshipbetweengradientweightsmoothingandresponselength.TheSimNPO’sweightsw′
+θ
+havebeenrescaled(by×10)foreaseofvisualization.
+(b)Inaddition,thereference-free,length-normalizedweightsmoothingpreventsearly-stageineffec-
+tivenessduringunlearning. Itcanbeshownfrom(5)thatw′(x,y)<2/|y|,withthedistributionof
+θ
+weightsw′(x,y)dependingonthespecificforgetdatasamples. ThiscontrastswithNPO,wherethe
+θ
+weightdistributionconcentratedaroundw (x,y)≈1duringtheearlyunlearningstage. Extended
+θ
+fromFig.3-(a)&(b),Fig.4providesadetailedcomparisonbetweenthegradientweightsofSimNPO
+andNPO.WefindthatSimNPOtendstoprioritizeshort-lengthforgetdatathatareinitiallyharder
+to forget during the first two unlearning epochs. At later epochs, the gradient weights become
+moreuniform,reflectingthatSimNPOcanthentreatdifferentforgetdatawithevenoptimization
+power. ThistrendisdifferentfromNPO,whichassignsmoreuniformgradientweightsearlyon
+andstartstoaccountfordata-specificdifficultyonlyinthelaterstagesofunlearning. Besidesthe
+aboveadvantage,wealsofindthatSimNPO’snewweightsmoothingschemedoesnotcompromise
+theoverallunlearningspeedcomparedtoNPO.Thisissupportedbythedivergenceratefromthe
+pre-trainedstateshowninFig.A4andourtheoreticaldiscussioninAppendixG.
+FurtheranalysesviaamixtureofMarkovchains. Inadditiontotheaboveinsights,wefurther
+validateSimNPO’sadvantagestoovercomeNPO’slimitations(Sec.4)usingasyntheticsetup. For
+easeofcontrollingtheunlearningdifficultiesofdifferentforgetdatapoints,weconsidertheproblem
+ofunlearningonamixtureofMarkovchainswithastatespaceofsize10(s=1,...,10). Theretain
+distributionconsistsofMarkovchainsthattransitionuniformlyamongstates{1,2,3}. Theforget
+distributionisamixtureoftwocomponents: Forget1,wherethechainstransitionuniformlyamong
+7
+
+=== PAGE 8 ===
+{4,5,6}, andForget2, wheretheymoveuniformlyamong{7,8,9}. Asmallleakageprobability
+allowsthechainstotransitionoutsidetheirdesignatedstatesoccasionally,includingstate10,which
+isnotadesignatedstateforanyofthechains. Wegenerate10,000samplesfortheretaindistribution
+and5,000sampleseachforForget1andForget2. AGPT-2modelispretrainedonthesesamplesand
+servesastheinitialmodel. WeapplyNPOandSimNPOtounlearntheforgetdistributions. Forget
+andretainperformanceisevaluatedusingtheKL-divergencebetweenpredictedandtruetransition
+probabilitiesoftheMarkovchains. SeeAppendixHfordetails. WepresentourresultsinFig.5and
+summarizetheinsightsbelow.
+0.5
+0.4
+0.3
+0.2
+0.1
+0.00.00 0.05 0.10 0.15 0.20 0.25
+Retain Distance
+ytilauQ
+tegroF
+1.0
+0.8
+0.6
+NPO - Forget1 0.4
+NPO - Forget2
+SimNPO - Forget1 0.2
+SimNPO - Forget2
+0.00.00 0.05 0.10 0.15 0.20 0.25 0.30
+Retain Distance
+ytilauQ
+tegroF
+SimNPO achieves more balanced unlearning
+acrossdataofvaryinglengthscomparedtoNPO.
+Tovalidatethis,wesettheretaindistributionand
+Forget1withasequencelengthof20,whileFor- NPO - Forget1
+NPO - Forget2
+get2isassignedashortersequencelengthof5, SimNPO - Forget1
+SimNPO - Forget2
+representingamixoflongandshortresponses.
+Fig.5(a)showsthatNPOexhibitsaworsetrade- (a)Differentlength. (b)Differentmemorization.
+off between retain distance and forget quality Figure5:Tradeoffsbetweenforgetquality(higher↑is
+onshortresponses(i.e.,Forget2)comparedwith better)andretaindistance(lower↓isbetter)alongthe
+SimNPO.Thatis,toachievethesameforgetqual- unlearningpathofNPOandSimNPOinthesynthetic
+ityonForget2astheretrainedmodel(withforget experiments. The symbols (⋆,•) near the y-axis of
+quality0.44),NPOincursahigherretaindistance bothfiguresindicatetheperformanceoftheretrained
+thanSimNPO.Asaresult,NPOhasanoverall modelonForget1andForget2,respectively.
+largerretaindistancewhenunlearningtheentireForgetdistribution. Incontrast,SimNPOshows
+moreconsistentperformanceacrossForget1andForget2,withlessvarianceinitstradeoff.
+SimNPOachievesmorebalancedunlearningacrossdataofvaryingmemorizationcomparedtoNPO.
+Inthesecondcase,wesettheretaindistribution,Forget1andForget2allwithasequencelengthof
+20. However,weexcludeForget2duringpretraining. Thissetupsimulatesascenariowheretheinitial
+model(i.e.,thereferencemodelinNPO)exhibitsvaryinglevelsofmemorizationfortheforgetdata:
+stronglymemorizedForget1againstForget2. Fig.5(b)showsthatNPOexhibitsalargergapbetween
+Forget1andForget2forthesameRetaindistance,leadingtoover-unlearningweakly-memorizeddata
+(asshownbythecomparisonbetweenNPO-Forget2vs. SimNPO-Forget2)andunder-unlearning
+strongly-memorizeddata(asshownbythecomparisonbetweenNPO-Forget1vs. SimNPO-Forget1).
+SimNPOhasabetterbalanceduringunlearningacrossdatawithvaryinglevelsofmemorization.
+6 Experiments
+6.1 Experimentsetups
+Datasetsandmethods. Weevaluateunlearningtasksonthreebenchmarkdatasets: TOFU[18],
+MUSE[4],andWMDP[3]. TOFUincludes‘Forget05’and‘Forget10’scenarios,representing5%
+and10%forgetsets,respectively. MUSEfocuseson‘Books’and‘News’forgettingscenarios,while
+WMDPtargetsknowledge-basedunlearningofhazardousbiosecurityinformation.
+LLMunlearningmethodsandevaluation. Weevaluatearangeofunlearningmethods,including
+Retrain, SimNPO, NPO, GA, and GradDiff. In addition, we incorporate several task-specific
+approaches: therejection-basedmethodIDK,whichreplacespositiveresponsesinDPOwithgeneric
+answerssuchas“Idon’tknow”[18],andRKLD[48]intheTOFU;theTaskVectormethodusedin
+MUSE[4];andtherepresentationmisdirectionunlearningmethodRMUinWMDP[3]. Evaluation
+metricsforeachbenchmarkaresummarizedinTableA1andfurtherdetailedinAppendixI.2. Forthe
+relearningattack,weuse20%oftheTOFUForget05setandretrainoverthreeepochs. Pleaserefer
+toAppendixI.2forfullexperimentaldetails.
+6.2 Experimentresults
+Performance on TOFU. In Table1, we present the unlearning performance of SimNPO and its
+variousbaselinesonTOFUForget05,coveringbotheffectivenessmetricsandutilitymetricsasshown
+inTableA1. ‘FQ’standsforforgetquality,and‘MU’representsmodelutility. Thesetwometrics
+serveastheprimaryperformanceindicatorsforLLMunlearningonTOFU.SimNPOoutperforms
+NPO in both FQ and MU, and is the closest approximate unlearning method to Retrain. Except
+forNPOandRKLD,theotherunlearningbaselines(GA,GradDiff,andIDK)arenoteffective,as
+impliedbytheirFQvaluesbeingsmallerthan0.01,whereFQindicatesthep-valueforrejectingthe
+8
+
+=== PAGE 9 ===
+Table1: UnlearningperformanceonTOFUForget05usingtheLLaMA2-7B-chatmodel.‘Prob.’indicatesthe
+probabilitymetrics,assummarizedinTableA1,withforgetquality(FQ)andmodelutility(MU)servingasthe
+primarymetrics.Resultsareaveragedoverfiverandomtrials.ThebestFQandMUarehighlightedinbold.
+UnlearningEfficacy UtilityPreservation
+Method (1-Rouge-L)↑ F ( o 1 r - g P e r t o S b e .) t ↑ Truthratio↑ FQ↑ Rouge-L↑ Re P a r l o A b u .↑ thor T s ruthratio↑ Rouge-L↑ W P o r r o ld b. F ↑ acts Truthratio↑ Rouge-L↑ R P e r t o a b in .↑ Set Truthratio↑ MU↑
+Original 0.04 0.01 0.49 0.00 0.93 0.44 0.58 0.91 0.43 0.55 0.98 0.99 0.48 0.62
+Retrain 0.61 0.85 0.66 1.00 0.92 0.44 0.57 0.90 0.43 0.54 0.97 0.99 0.48 0.62
+GA 1.00 1.00 0.66 1.9e-9 0.00 0.20 0.40 0.00 0.30 0.28 0.00 0.00 0.15 0.00
+GradDiff 1.00 1.00 0.60 3.6e-9 0.59 0.59 0.81 0.88 0.46 0.59 0.42 0.49 0.48 0.56
+IDK 0.98 0.40 0.55 1.9e-9 0.65 0.48 0.63 0.82 0.44 0.55 0.55 0.86 0.43 0.57
+RKLD 0.69 0.96 0.66 0.79 0.92 0.47 0.61 0.87 0.47 0.58 0.58 0.52 0.43 0.56
+NPO 0.73 0.94 0.67 0.79 0.91 0.50 0.62 0.90 0.50 0.61 0.47 0.51 0.44 0.57
+SimNPO 0.74 0.97 0.69 0.99 0.90 0.50 0.64 0.90 0.48 0.60 0.54 0.56 0.44 0.58
+indistinguishabilitybetweentheunlearnedmodelandRetrainonTOFU.InTableA5ofAppendixJ,
+wealsoprovideexamplesofmodelresponsesafterunlearningusingSimNPO,Retrain,andNPO,
+alongwithlabeltodegenerate. Weobservethat, insomecases(e.g., responsesagainsttheinput
+queriesQ1andQ2inTableA5), theNPO-unlearnedmodelgeneratesrepeatedtextsinresponse.
+Whilethisrepetitiondoesnotrevealtheinformationintendedforunlearning,itdiffersnoticeably
+fromRetrain. Incontrast,SimNPOproducesunlearningresponsesmorecloselyalignedwiththose
+generatedbyRetrain. MoreresultsonTOFUForget10areinTableA3ofAppendixI.3.
+PerformanceonMUSEandWMDP.Table2com- Table 2: Performance of various unlearning
+paresSimNPOwithothermethods,onMUSENews methods on MUSE News (LLaMA2-7B) and
+andBooks,withevaluationmetricsinTableA1. Com- MUSEBooks(ICLM-7B).
+paredtoNPO,SimNPOpreserveshigherutilitywhile UnlearningEfficacy Utility
+achievingstrongerunlearning. OnD ,KnowMemis Method VerbMem KnowMem PrivLeak KnowMem
+r Df(↓) Df(↓) (→0) Dr(↑)
+39.65 (News) and 48.27 (Books), while on D , it is
+f MUSENews
+44.84(News)and0.00(Books).SimNPOalsoattainsa Original 58.29 62.93 -98.71 54.31
+Retrain 20.75 33.32 0.00 53.79
+PrivLeakvaluecloserto0thanNPO(72.93forNews,
+GA 0.00 0.00 20.14 0.00
+−31.17forBooks),indicatingitbetterapproximates GradDiff 4.85 31.29 108.12 28.21
+TaskVector 77.42 58.76 -100.00 47.94
+completedataremoval[4]. Comparedtoothermeth- NPO 2.53 56.93 108.91 37.58
+SimNPO 2.34 44.84 72.93 39.65
+ods,SimNPOstrikesthebestbalancebetweenutility
+MUSEBooks
+andunlearning.Wefurtherevaluatesequentialunlearn- Original 99.56 58.32 -56.32 67.01
+ingonMUSENews(Fig.A5inAppendixI.4),where Retrain 14.30 28.90 0.00 74.50
+GA 0.00 0.00 -24.07 0.00
+SimNPOconsistentlyoutperformsNPOasrequestsin- GradDiff 0.00 0.00 -24.59 0.13
+TaskVector 99.31 35.55 -83.78 62.55
+crease.Duetospaceconstraints,wepresentSimNPO’s NPO 0.00 0.00 -31.17 23.71
+performanceontheWMDPdatasetinAppendixI.5. SimNPO 0.00 0.00 -19.82 48.27
+Random NPO
+Shortest SimNPO
+1.0
+0.8
+0.6
+0.4
+0.2
+0.0
+0 1 2 3
+Relearning Epoch
+ytilauQ
+tegroF
+Unlearningrobustnessagainstlength-variantrelearningattacks. Re-
+cent studies [24, 25] show that unlearning methods are vulnerable to
+relearningattacks,whereforgotteninformationcanberecoveredbyfine-
+tuningonasubsetoftheforgetset. WeevaluateSimNPO’srobustness
+againstsuchattacks,showingittooutperformNPO,especiallyforshort-
+lengthresponsedata. Fig.6presentstheforgetqualityofSimNPOand
+NPOunderrelearningattacksagainstthenumberofrelearningepochs.
+Relearningisperformedontheforgetsubset,whichiseithertheshort-
+est20%ofresponsesfromtheTOFUForget05datasetoranequal-size
+randomsubset.Werefertotheseattacksas‘shortest-relearn’and‘random-
+relearn’,respectively. Therandom-relearncaseisconducted5times,with
+Figure 6: NPO and Sim-
+bothaveragerobustnessandvarianceinFig.6. Aswecansee,SimNPO
+NPOunderrandom/shortest
+demonstratesimprovedrobustnessoverNPO,evidencedbyhigherforget
+relearnattackvs.epochson
+quality and a slower decline in forget quality as the relearning epoch TOFUForget05.
+increases. NPOislessrobustagainsttheshortest-relearnattackcompared
+totherandom-relearnattack. Incontrast,SimNPOisresilienttobothtypesofrelearning. Thisis
+expectedsinceSimNPOaddressesthelimitation(L1),asexplainedinSec.4.
+7 Conclusion
+We identified a reference model bias in negative preference optimization (NPO) that limits un-
+learning effectiveness. To address this, we proposed SimNPO, a simpler framework leveraging
+preferenceoptimizationwithoutareferencemodel. SimNPOconsistentlyoutperformsNPOacross
+9
+
+=== PAGE 10 ===
+standardbenchmarkssuchasTOFU,MUSE,andWMDP,anddemonstratesadditionaladvantagesin
+unlearningrobustnessandtheapplicationtoreasoningmodelunlearning.
+BroaderImpact
+Onthepositiveside, wehavedemonstratedtheutilityofpreferenceoptimizationinmachineun-
+learning. ThisconnectionenablesmoreefficientunlearningoperationsinLLMs,improvingdata
+privacyprotectionsandsupportingcompliancewithregulatoryrequirements. Additionally,given
+therelationshipbetweenpreferenceoptimizationandmodelediting,ourworkencouragesfurther
+explorationintheseareas,contributingtothedevelopmentofmodelsthatareeasiertocustomize
+andbecomesafertodeploy. Onthenegativeside,themethodswedevelopedcouldbemisusedto
+selectivelyerase“essential”(ratherthan“unwanted”)conceptsorknowledge,raisingethicaland
+legalconcerns. Tomitigatethisrisk,itisessentialtoensurethatunlearningapplicationsadhereto
+strictethicalguidelinestopreventmisuse. Wehopeourresearchfostersthedevelopmentofsafe,
+reliable,andhuman-alignedLLMs.
+Limitations
+WhileSimNPOmitigatesthereferencemodelbiaspresentinNPOandimprovesgradientweight
+smoothingtobetteradjustdivergencespeedbasedonthevaryingunlearningdifficultiesofforgetdata
+samples,bothframeworksstillrelyonpromotingdivergencetoachieveunlearning. Thisreliance
+inevitably results in some degree of utility loss. This limitation becomes especially evident in
+knowledge unlearning or model capability removal scenarios, such as in the WMDP unlearning
+benchmark. Consequently,SimNPOhasyettofullyresolvethechallengeofbalancingunlearning
+effectiveness with model utility. Additionally, establishing theoretical guarantees for SimNPO
+remainsanimportantareaforfutureresearch.
+Acknowledgement
+C.Fan,J.Liu,J.Jia,andS.LiuweresupportedinpartbytheNationalScienceFoundation(NSF)
+CISECoreProgramAwardsIIS-2207052andIIS-2504263,theNSFCAREERAwardIIS-2338068,
+theAROAwardW911NF2310343, theAmazonResearchAwardforAIinInformationSecurity,
+theOpenPhilanthropyResearchAward,andtheCenterforAISafety(CAIS)ComputeAward. We
+alsoextendourgratitudetotheMIT-IBMWatsonAILab,IBMResearchfortheirsupportinthis
+project. L.Lin,R.Zhang,andS.MeiweresupportedinpartbyNSFCCF-2315725,NSFCareer
+DMS-2339904, ONR N00014-24-S-B001, an Amazon Research Award, and a Google Research
+ScholarAward. WealsothankthesupportfromtheCenterforAISafetyComputeCluster. Finally,
+weexpressourappreciationtoYuguangYaoforhishelpinfigureplotting.
+References
+[1] Y. Huang, L. Sun, H. Wang, S. Wu, Q. Zhang, Y. Li, C. Gao, Y. Huang et al., “Position:
+TrustLLM:Trustworthinessinlargelanguagemodels,”inProceedingsofthe41stInternational
+ConferenceonMachineLearning,ser.ProceedingsofMachineLearningResearch,vol.235,
+21–27Jul2024,pp.20166–20270.
+[2] B.Wang,W.Chen,H.Pei,C.Xie,M.Kang,C.Zhang,C.Xu,Z.Xiong,R.Dutta,R.Schaeffer
+et al., “Decodingtrust: A comprehensive assessment of trustworthiness in gpt models.” in
+NeurIPS,2023.
+[3] N.Li,A.Pan,A.Gopal,S.Yue,D.Berrios,A.Gatti,J.D.Li,A.-K.Dombrowski,S.Goel,
+L.Phanetal.,“Thewmdpbenchmark: Measuringandreducingmalicioususewithunlearning,”
+arXivpreprintarXiv:2403.03218,2024.
+[4] W.Shi,J.Lee,Y.Huang,S.Malladi,J.Zhao,A.Holtzman,D.Liu,L.Zettlemoyer,N.A.Smith,
+andC.Zhang,“Muse: Machineunlearningsix-wayevaluationforlanguagemodels,”arXiv
+preprintarXiv:2407.06460,2024.
+10
+
+=== PAGE 11 ===
+[5] S.Liu,Y.Yao,J.Jia,S.Casper,N.Baracaldo,P.Hase,Y.Yao,C.Y.Liu,X.Xu,H.Lietal.,
+“Rethinkingmachineunlearningforlargelanguagemodels,”NatureMachineIntelligence,pp.
+1–14,2025.
+[6] J.Rosen,“Therighttobeforgotten,”Stan.L.Rev.Online,vol.64,p.88,2011.
+[7] C. J. Hoofnagle, B. van der Sloot, and F. Z. Borgesius, “The european union general data
+protectionregulation:whatitisandwhatitmeans,”Information&CommunicationsTechnology
+Law,vol.28,no.1,pp.65–98,2019.
+[8] Y.CaoandJ.Yang,“Towardsmakingsystemsforgetwithmachineunlearning,”in2015IEEE
+symposiumonsecurityandprivacy. IEEE,2015,pp.463–480.
+[9] A.Warnecke,L.Pirch,C.Wressnegger,andK.Rieck,“Machineunlearningoffeaturesand
+labels,”arXivpreprintarXiv:2108.11577,2021.
+[10] L.Bourtoule,V.Chandrasekaran,C.A.Choquette-Choo,H.Jia,A.Travers,B.Zhang,D.Lie,
+andN.Papernot,“Machineunlearning,”in2021IEEESymposiumonSecurityandPrivacy
+(SP). IEEE,2021,pp.141–159.
+[11] A.Thudi,G.Deza,V.Chandrasekaran,andN.Papernot,“Unrollingsgd: Understandingfactors
+influencing machine unlearning,” in 2022 IEEE 7th European Symposium on Security and
+Privacy(EuroS&P). IEEE,2022,pp.303–319.
+[12] M.Kurmanji,P.Triantafillou,J.Hayes,andE.Triantafillou,“Towardsunboundedmachine
+unlearning,”Advancesinneuralinformationprocessingsystems,vol.36,2024.
+[13] J.Jia,J.Liu,P.Ram,Y.Yao,G.Liu,Y.Liu,P.Sharma,andS.Liu,“Modelsparsitycansimplify
+machineunlearning,”inThirty-seventhConferenceonNeuralInformationProcessingSystems,
+2023.
+[14] R.Gandikota,J.Materzynska,J.Fiotto-Kaufman,andD.Bau,“Erasingconceptsfromdiffusion
+models,”inProceedingsoftheIEEE/CVFInternationalConferenceonComputerVision,2023,
+pp.2426–2436.
+[15] C.Fan,J.Liu,Y.Zhang,D.Wei,E.Wong,andS.Liu,“Salun:Empoweringmachineunlearning
+viagradient-basedweightsaliencyinbothimageclassificationandgeneration,”inInternational
+ConferenceonLearningRepresentations,2024.
+[16] R.EldanandM.Russinovich,“Who’sharrypotter? approximateunlearninginllms,”2023.
+[17] Y.Yao,X.Xu,andY.Liu,“Largelanguagemodelunlearning,”arXivpreprintarXiv:2310.10683,
+2023.
+[18] P.Maini,Z.Feng,A.Schwarzschild,Z.C.Lipton,andJ.Z.Kolter,“Tofu: Ataskoffictitious
+unlearningforllms,”2024.
+[19] R.Zhang,L.Lin,Y.Bai,andS.Mei,“Negativepreferenceoptimization: Fromcatastrophic
+collapsetoeffectiveunlearning,”arXivpreprintarXiv:2404.05868,2024.
+[20] J. Jia, Y. Zhang, Y. Zhang, J. Liu, B. Runwal, J. Diffenderfer, B. Kailkhura, and S. Liu,
+“Soul: Unlockingthepowerofsecond-orderoptimizationforllmunlearning,”arXivpreprint
+arXiv:2404.18239,2024.
+[21] B.Liu,Q.Liu,andP.Stone,“Continuallearningandprivateunlearning,”inConferenceon
+LifelongLearningAgents. PMLR,2022,pp.243–254.
+[22] R.Rafailov,A.Sharma,E.Mitchell,C.D.Manning,S.Ermon,andC.Finn,“Directpreference
+optimization:Yourlanguagemodelissecretlyarewardmodel,”AdvancesinNeuralInformation
+ProcessingSystems,vol.36,2024.
+[23] Y.Meng,M.Xia,andD.Chen,“SimPO:Simplepreferenceoptimizationwithareference-free
+reward,”inTheThirty-eighthAnnualConferenceonNeuralInformationProcessingSystems,
+2024.
+11
+
+=== PAGE 12 ===
+[24] A.Lynch,P.Guo,A.Ewart,S.Casper,andD.Hadfield-Menell,“Eightmethodstoevaluate
+robustunlearninginllms,”arXivpreprintarXiv:2402.16835,2024.
+[25] S.Hu,Y.Fu,Z.S.Wu,andV.Smith,“Joggingthememoryofunlearnedmodelthroughtargeted
+relearningattack,”arXivpreprintarXiv:2406.13356,2024.
+[26] T.T.Nguyen,T.T.Huynh,P.L.Nguyen,A.W.-C.Liew,H.Yin,andQ.V.H.Nguyen,“A
+surveyofmachineunlearning,”arXivpreprintarXiv:2209.02299,2022.
+[27] E.Triantafillou,P.Kairouz,F.Pedregosa,J.Hayes,M.Kurmanji,K.Zhao,V.Dumoulin,J.J.
+Junior,I.Mitliagkas,J.Wanetal.,“Arewemakingprogressinunlearning? findingsfromthe
+firstneuripsunlearningcompetition,”arXivpreprintarXiv:2406.09073,2024.
+[28] Y.Liu,M.Fan,C.Chen,X.Liu,Z.Ma,L.Wang,andJ.Ma,“Backdoordefensewithmachine
+unlearning,”inIEEEINFOCOM2022-IEEEConferenceonComputerCommunications. IEEE,
+2022,pp.280–289.
+[29] C.Fan,J.Liu,A.Hero,andS.Liu,“Challengingforgets: Unveilingtheworst-caseforgetsets
+inmachineunlearning,”arXivpreprintarXiv:2403.07362,2024.
+[30] Y. Zhang, Y. Zhang, Y. Yao, J. Jia, J. Liu, X. Liu, and S. Liu, “Unlearncanvas: A styl-
+ized image dataset to benchmark machine unlearning for diffusion models,” arXiv preprint
+arXiv:2402.11846,2024.
+[31] Y.Liu,L.Xu,X.Yuan,C.Wang,andB.Li,“Therighttobeforgotteninfederatedlearning:
+Anefficientrealizationwithrapidretraining,”inIEEEINFOCOM2022-IEEEConferenceon
+ComputerCommunications. IEEE,2022,pp.1749–1758.
+[32] A.Halimi,S.Kadhe,A.Rawat,andN.Baracaldo,“Federatedunlearning: Howtoefficiently
+eraseaclientinfl?” arXivpreprintarXiv:2207.05521,2022.
+[33] R.Jin,M.Chen,Q.Zhang,andX.Li,“Forgettablefederatedlinearlearningwithcertifieddata
+removal,”arXivpreprintarXiv:2306.02216,2023.
+[34] M.Chen,Z.Zhang,T.Wang,M.Backes,M.Humbert,andY.Zhang,“Graphunlearning,”in
+Proceedingsofthe2022ACMSIGSACConferenceonComputerandCommunicationsSecurity,
+2022,pp.499–513.
+[35] E. Chien, C. Pan, and O. Milenkovic, “Certified graph unlearning,” arXiv preprint
+arXiv:2206.09140,2022.
+[36] K.Wu,J.Shen,Y.Ning,T.Wang,andW.H.Wang,“Certifiededgeunlearningforgraphneural
+networks,”inProceedingsofthe29thACMSIGKDDConferenceonKnowledgeDiscoveryand
+DataMining,2023,pp.2606–2617.
+[37] X.Lu,S.Welleck,J.Hessel,L.Jiang,L.Qin,P.West,P.Ammanabrolu,andY.Choi,“Quark:
+Controllable text generation with reinforced unlearning,” Advances in neural information
+processingsystems,vol.35,pp.27591–27609,2022.
+[38] J.Jang,D.Yoon,S.Yang,S.Cha,M.Lee,L.Logeswaran,andM.Seo,“Knowledgeunlearning
+formitigatingprivacyrisksinlanguagemodels,”arXivpreprintarXiv:2210.01504,2022.
+[39] V.B.Kumar,R.Gangadharaiah,andD.Roth,“Privacyadheringmachineun-learninginnlp,”
+arXivpreprintarXiv:2212.09573,2022.
+[40] E. Zhang, K. Wang, X. Xu, Z. Wang, and H. Shi, “Forget-me-not: Learning to forget in
+text-to-imagediffusionmodels,”arXivpreprintarXiv:2303.17591,2023.
+[41] M.Pawelczyk,S.Neel,andH.Lakkaraju,“In-contextunlearning: Languagemodelsasfew
+shotunlearners,”arXivpreprintarXiv:2310.07579,2023.
+[42] Y. Ishibashi and H. Shimodaira, “Knowledge sanitization of large language models,” arXiv
+preprintarXiv:2309.11852,2023.
+12
+
+=== PAGE 13 ===
+[43] Y.Wang,R.Wu,Z.He,X.Chen,andJ.McAuley,“Largescaleknowledgewashing,”arXiv
+preprintarXiv:2405.16720,2024.
+[44] C.Y.Liu,Y.Wang,J.Flanigan,andY.Liu,“Largelanguagemodelunlearningviaembedding-
+corruptedprompts,”arXivpreprintarXiv:2406.07933,2024.
+[45] P.Thaker,Y.Maurya,andV.Smith,“Guardrailbaselinesforunlearninginllms,”arXivpreprint
+arXiv:2403.03329,2024.
+[46] S.R.Kadhe,F.Ahmed,D.Wei,N.Baracaldo,andI.Padhi,“Split,unlearn,merge: Leveraging
+dataattributesformoreeffectiveunlearninginllms,”arXivpreprintarXiv:2406.11780,2024.
+[47] T.Gu,K.Huang,R.Luo,Y.Yao,Y.Yang,Y.Teng,andY.Wang,“Meow: Memorysupervised
+llmunlearningviainvertedfacts,”arXivpreprintarXiv:2409.11844,2024.
+[48] B.Wang,Y.Zi,Y.Sun,Y.Zhao,andB.Qin,“Rkld: Reversekl-divergence-basedknowledge
+distillation for unlearning personal information in large language models,” arXiv preprint
+arXiv:2406.01983,2024.
+[49] A.Mekala,V.Dorna,S.Dubey,A.Lalwani,D.Koleczek,M.Rungta,S.Hasan,andE.Lobo,
+“Alternatepreferenceoptimizationforunlearningfactualknowledgeinlargelanguagemodels,”
+arXivpreprintarXiv:2409.13474,2024.
+[50] X.Wu,J.Li,M.Xu,W.Dong,S.Wu,C.Bian,andD.Xiong,“Depn: Detectingandediting
+privacyneuronsinpretrainedlanguagemodels,”arXivpreprintarXiv:2310.20138,2023.
+[51] C.Barrett,B.Boyd,E.Bursztein,N.Carlini,B.Chen,J.Choi,A.R.Chowdhury,M.Christodor-
+escu,A.Datta,S.Feizietal.,“Identifyingandmitigatingthesecurityrisksofgenerativeai,”
+FoundationsandTrends®inPrivacyandSecurity,vol.6,no.1,pp.1–52,2023.
+[52] C.Yu,S.Jeoung,A.Kasi,P.Yu,andH.Ji,“Unlearningbiasinlanguagemodelsbypartitioning
+gradients,”inFindingsoftheAssociationforComputationalLinguistics: ACL2023,2023,pp.
+6032–6048.
+[53] G. Ilharco, M. T. Ribeiro, M. Wortsman, S. Gururangan, L. Schmidt, H. Hajishirzi, and
+A.Farhadi,“Editingmodelswithtaskarithmetic,”arXivpreprintarXiv:2212.04089,2022.
+[54] A.Schwarzschild,Z.Feng,P.Maini,Z.C.Lipton,andJ.Z.Kolter,“Rethinkingllmmemoriza-
+tionthroughthelensofadversarialcompression,”arXivpreprintarXiv:2404.15146,2024.
+[55] V.Patil,P.Hase,andM.Bansal,“Cansensitiveinformationbedeletedfromllms? objectives
+fordefendingagainstextractionattacks,”ICLR,2024.
+[56] P.F.Christiano,J.Leike,T.Brown,M.Martic,S.Legg,andD.Amodei,“Deepreinforcement
+learningfromhumanpreferences,”Advancesinneuralinformationprocessingsystems,vol.30,
+2017.
+[57] D.M.Ziegler,N.Stiennon,J.Wu,T.B.Brown,A.Radford,D.Amodei,P.Christiano,andG.Irv-
+ing,“Fine-tuninglanguagemodelsfromhumanpreferences,”arXivpreprintarXiv:1909.08593,
+2019.
+[58] L.Ouyang,J.Wu,X.Jiang,D.Almeida,C.Wainwright,P.Mishkin,C.Zhang,S.Agarwal,
+K.Slama,A.Rayetal.,“Traininglanguagemodelstofollowinstructionswithhumanfeedback,”
+Advancesinneuralinformationprocessingsystems,vol.35,pp.27730–27744,2022.
+[59] M.Santacroce,Y.Lu,H.Yu,Y.Li,andY.Shen,“Efficientrlhf: Reducingthememoryusageof
+ppo,”arXivpreprintarXiv:2309.00754,2023.
+[60] R.Zheng,S.Dou,S.Gao,Y.Hua,W.Shen,B.Wang,Y.Liu,S.Jin,Q.Liu,Y.Zhouetal.,
+“Secretsofrlhfinlargelanguagemodelsparti: Ppo,”arXivpreprintarXiv:2307.04964,2023.
+[61] Y.Zhao,R.Joshi,T.Liu,M.Khalman,M.Saleh,andP.J.Liu,“Slic-hf: Sequencelikelihood
+calibrationwithhumanfeedback,”arXivpreprintarXiv:2305.10425,2023.
+13
+
+=== PAGE 14 ===
+[62] M.G.Azar,Z.D.Guo,B.Piot,R.Munos,M.Rowland,M.Valko,andD.Calandriello,“A
+generaltheoreticalparadigmtounderstandlearningfromhumanpreferences,”inInternational
+ConferenceonArtificialIntelligenceandStatistics. PMLR,2024,pp.4447–4455.
+[63] J.Hong,N.Lee,andJ.Thorne,“Reference-freemonolithicpreferenceoptimizationwithodds
+ratio,”arXivpreprintarXiv:2403.07691,2024.
+[64] K.Ethayarajh,W.Xu,N.Muennighoff,D.Jurafsky,andD.Kiela,“Kto: Modelalignmentas
+prospecttheoreticoptimization,”arXivpreprintarXiv:2402.01306,2024.
+[65] H.Yuan,Z.Yuan,C.Tan,W.Wang,S.Huang,andF.Huang,“Rrhf: Rankresponsestoalign
+languagemodelswithhumanfeedback,”AdvancesinNeuralInformationProcessingSystems,
+vol.36,2024.
+[66] A.Radford,J.Wu,R.Child,D.Luan,D.Amodei,I.Sutskeveretal.,“Languagemodelsare
+unsupervisedmultitasklearners,”OpenAIblog,vol.1,no.8,p.9,2019.
+[67] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” arXiv preprint
+arXiv:1711.05101,2017.
+14
+
+=== PAGE 15 ===
+NeurIPSPaperChecklist
+1. Claims
+Question: Dothemainclaimsmadeintheabstractandintroductionaccuratelyreflectthe
+paper’scontributionsandscope?
+Answer: [Yes]
+Justification: OurmainclaimsareoutlinedintheabstractandSection1. Comprehensive
+detailsareprovidedinSections3,4,5and6.
+Guidelines:
+• The answer NA means that the abstract and introduction do not include the claims
+madeinthepaper.
+• Theabstractand/orintroductionshouldclearlystatetheclaimsmade,includingthe
+contributionsmadeinthepaperandimportantassumptionsandlimitations. ANoor
+NAanswertothisquestionwillnotbeperceivedwellbythereviewers.
+• Theclaimsmadeshouldmatchtheoreticalandexperimentalresults,andreflecthow
+muchtheresultscanbeexpectedtogeneralizetoothersettings.
+• Itisfinetoincludeaspirationalgoalsasmotivationaslongasitisclearthatthesegoals
+arenotattainedbythepaper.
+2. Limitations
+Question: Doesthepaperdiscussthelimitationsoftheworkperformedbytheauthors?
+Answer: [Yes]
+Justification: LimitationsofourworkarediscussedinAppendix7.
+Guidelines:
+• TheanswerNAmeansthatthepaperhasnolimitationwhiletheanswerNomeansthat
+thepaperhaslimitations,butthosearenotdiscussedinthepaper.
+• Theauthorsareencouragedtocreateaseparate“Limitations”sectionintheirpaper.
+• Thepapershouldpointoutanystrongassumptionsandhowrobusttheresultsareto
+violationsoftheseassumptions(e.g.,independenceassumptions,noiselesssettings,
+modelwell-specification,asymptoticapproximationsonlyholdinglocally).Theauthors
+shouldreflectonhowtheseassumptionsmightbeviolatedinpracticeandwhatthe
+implicationswouldbe.
+• Theauthorsshouldreflectonthescopeoftheclaimsmade,e.g.,iftheapproachwas
+onlytestedonafewdatasetsorwithafewruns. Ingeneral,empiricalresultsoften
+dependonimplicitassumptions,whichshouldbearticulated.
+• Theauthorsshouldreflectonthefactorsthatinfluencetheperformanceoftheapproach.
+Forexample,afacialrecognitionalgorithmmayperformpoorlywhenimageresolution
+isloworimagesaretakeninlowlighting. Oraspeech-to-textsystemmightnotbe
+usedreliablytoprovideclosedcaptionsforonlinelecturesbecauseitfailstohandle
+technicaljargon.
+• Theauthorsshoulddiscussthecomputationalefficiencyoftheproposedalgorithms
+andhowtheyscalewithdatasetsize.
+• If applicable, the authors should discuss possible limitations of their approach to
+addressproblemsofprivacyandfairness.
+• Whiletheauthorsmightfearthatcompletehonestyaboutlimitationsmightbeusedby
+reviewersasgroundsforrejection,aworseoutcomemightbethatreviewersdiscover
+limitationsthataren’tacknowledgedinthepaper. Theauthorsshouldusetheirbest
+judgmentandrecognizethatindividualactionsinfavoroftransparencyplayanimpor-
+tantroleindevelopingnormsthatpreservetheintegrityofthecommunity. Reviewers
+willbespecificallyinstructedtonotpenalizehonestyconcerninglimitations.
+3. Theoryassumptionsandproofs
+Question: Foreachtheoreticalresult,doesthepaperprovidethefullsetofassumptionsand
+acomplete(andcorrect)proof?
+Answer: [Yes]
+15
+
+=== PAGE 16 ===
+Justification: Theoreticalanalysesofthegradientandunlearningspeedofourmethodare
+providedinAppendixEandG.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludetheoreticalresults.
+• Allthetheorems, formulas, andproofsinthepapershouldbenumberedandcross-
+referenced.
+• Allassumptionsshouldbeclearlystatedorreferencedinthestatementofanytheorems.
+• Theproofscaneitherappearinthemainpaperorthesupplementalmaterial, butif
+theyappearinthesupplementalmaterial,theauthorsareencouragedtoprovideashort
+proofsketchtoprovideintuition.
+• Inversely,anyinformalproofprovidedinthecoreofthepapershouldbecomplemented
+byformalproofsprovidedinappendixorsupplementalmaterial.
+• TheoremsandLemmasthattheproofreliesuponshouldbeproperlyreferenced.
+4. Experimentalresultreproducibility
+Question: Doesthepaperfullydisclosealltheinformationneededtoreproducethemainex-
+perimentalresultsofthepapertotheextentthatitaffectsthemainclaimsand/orconclusions
+ofthepaper(regardlessofwhetherthecodeanddataareprovidedornot)?
+Answer: [Yes]
+Justification: TheexperimentalsetupisdetailedinSection6andAppendixI.2.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Ifthepaperincludesexperiments,aNoanswertothisquestionwillnotbeperceived
+well by the reviewers: Making the paper reproducible is important, regardless of
+whetherthecodeanddataareprovidedornot.
+• Ifthecontributionisadatasetand/ormodel,theauthorsshoulddescribethestepstaken
+tomaketheirresultsreproducibleorverifiable.
+• Dependingonthecontribution,reproducibilitycanbeaccomplishedinvariousways.
+Forexample,ifthecontributionisanovelarchitecture,describingthearchitecturefully
+mightsuffice,orifthecontributionisaspecificmodelandempiricalevaluation,itmay
+benecessarytoeithermakeitpossibleforotherstoreplicatethemodelwiththesame
+dataset,orprovideaccesstothemodel. Ingeneral. releasingcodeanddataisoften
+onegoodwaytoaccomplishthis,butreproducibilitycanalsobeprovidedviadetailed
+instructionsforhowtoreplicatetheresults,accesstoahostedmodel(e.g.,inthecase
+ofalargelanguagemodel),releasingofamodelcheckpoint,orothermeansthatare
+appropriatetotheresearchperformed.
+• WhileNeurIPSdoesnotrequirereleasingcode,theconferencedoesrequireallsubmis-
+sionstoprovidesomereasonableavenueforreproducibility,whichmaydependonthe
+natureofthecontribution. Forexample
+(a) Ifthecontributionisprimarilyanewalgorithm,thepapershouldmakeitclearhow
+toreproducethatalgorithm.
+(b) Ifthecontributionisprimarilyanewmodelarchitecture,thepapershoulddescribe
+thearchitectureclearlyandfully.
+(c) Ifthecontributionisanewmodel(e.g.,alargelanguagemodel),thenthereshould
+eitherbeawaytoaccessthismodelforreproducingtheresultsorawaytoreproduce
+themodel(e.g.,withanopen-sourcedatasetorinstructionsforhowtoconstruct
+thedataset).
+(d) We recognize that reproducibility may be tricky in some cases, in which case
+authorsarewelcometodescribetheparticularwaytheyprovideforreproducibility.
+Inthecaseofclosed-sourcemodels,itmaybethataccesstothemodelislimitedin
+someway(e.g.,toregisteredusers),butitshouldbepossibleforotherresearchers
+tohavesomepathtoreproducingorverifyingtheresults.
+5. Openaccesstodataandcode
+Question: Doesthepaperprovideopenaccesstothedataandcode,withsufficientinstruc-
+tionstofaithfullyreproducethemainexperimentalresults,asdescribedinsupplemental
+material?
+16
+
+=== PAGE 17 ===
+Answer: [Yes]
+Justification: Theimplementationcodeisincludedinthesupplementarymaterials.
+Guidelines:
+• TheanswerNAmeansthatpaperdoesnotincludeexperimentsrequiringcode.
+• Please see the NeurIPS code and data submission guidelines (https://nips.cc/
+public/guides/CodeSubmissionPolicy)formoredetails.
+• Whileweencouragethereleaseofcodeanddata,weunderstandthatthismightnotbe
+possible,so“No”isanacceptableanswer. Paperscannotberejectedsimplyfornot
+includingcode,unlessthisiscentraltothecontribution(e.g.,foranewopen-source
+benchmark).
+• Theinstructionsshouldcontaintheexactcommandandenvironmentneededtorunto
+reproducetheresults. SeetheNeurIPScodeanddatasubmissionguidelines(https:
+//nips.cc/public/guides/CodeSubmissionPolicy)formoredetails.
+• Theauthorsshouldprovideinstructionsondataaccessandpreparation,includinghow
+toaccesstherawdata,preprocesseddata,intermediatedata,andgenerateddata,etc.
+• Theauthorsshouldprovidescriptstoreproduceallexperimentalresultsforthenew
+proposedmethodandbaselines. Ifonlyasubsetofexperimentsarereproducible,they
+shouldstatewhichonesareomittedfromthescriptandwhy.
+• Atsubmissiontime, topreserveanonymity, theauthorsshouldreleaseanonymized
+versions(ifapplicable).
+• Providingasmuchinformationaspossibleinsupplementalmaterial(appendedtothe
+paper)isrecommended,butincludingURLstodataandcodeispermitted.
+6. Experimentalsetting/details
+Question: Doesthepaperspecifyallthetrainingandtestdetails(e.g.,datasplits,hyper-
+parameters, how they were chosen, type of optimizer, etc.) necessary to understand the
+results?
+Answer: [Yes]
+Justification: TheexperimentalsetupisdetailedinSection6andAppendixI.2.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Theexperimentalsettingshouldbepresentedinthecoreofthepapertoalevelofdetail
+thatisnecessarytoappreciatetheresultsandmakesenseofthem.
+• Thefulldetailscanbeprovidedeitherwiththecode,inappendix,orassupplemental
+material.
+7. Experimentstatisticalsignificance
+Question:Doesthepaperreporterrorbarssuitablyandcorrectlydefinedorotherappropriate
+informationaboutthestatisticalsignificanceoftheexperiments?
+Answer: [Yes]
+Justification: To ensurea fairevaluation, we performmultiple runsfor eachsettingand
+reporttheaverageperformance. Asanexample,Fig.6presentstheresultswitherrorbars.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Theauthorsshouldanswer“Yes”iftheresultsareaccompaniedbyerrorbars,confi-
+denceintervals,orstatisticalsignificancetests,atleastfortheexperimentsthatsupport
+themainclaimsofthepaper.
+• Thefactorsofvariabilitythattheerrorbarsarecapturingshouldbeclearlystated(for
+example,train/testsplit,initialization,randomdrawingofsomeparameter,oroverall
+runwithgivenexperimentalconditions).
+• Themethodforcalculatingtheerrorbarsshouldbeexplained(closedformformula,
+calltoalibraryfunction,bootstrap,etc.)
+• Theassumptionsmadeshouldbegiven(e.g.,Normallydistributederrors).
+17
+
+=== PAGE 18 ===
+• Itshouldbeclearwhethertheerrorbaristhestandarddeviationorthestandarderror
+ofthemean.
+• It is OK to report 1-sigma error bars, but one should state it. The authors should
+preferablyreporta2-sigmaerrorbarthanstatethattheyhavea96%CI,ifthehypothesis
+ofNormalityoferrorsisnotverified.
+• Forasymmetricdistributions,theauthorsshouldbecarefulnottoshowintablesor
+figuressymmetricerrorbarsthatwouldyieldresultsthatareoutofrange(e.g. negative
+errorrates).
+• Iferrorbarsarereportedintablesorplots,Theauthorsshouldexplaininthetexthow
+theywerecalculatedandreferencethecorrespondingfiguresortablesinthetext.
+8. Experimentscomputeresources
+Question: Foreachexperiment,doesthepaperprovidesufficientinformationonthecom-
+puterresources(typeofcomputeworkers,memory,timeofexecution)neededtoreproduce
+theexperiments?
+Answer: [Yes]
+Justification: ThecomputerresourcesaredetailedinAppendixI.2.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• ThepapershouldindicatethetypeofcomputeworkersCPUorGPU,internalcluster,
+orcloudprovider,includingrelevantmemoryandstorage.
+• Thepapershouldprovidetheamountofcomputerequiredforeachoftheindividual
+experimentalrunsaswellasestimatethetotalcompute.
+• Thepapershoulddisclosewhetherthefullresearchprojectrequiredmorecompute
+thantheexperimentsreportedinthepaper(e.g.,preliminaryorfailedexperimentsthat
+didn’tmakeitintothepaper).
+9. Codeofethics
+Question: Doestheresearchconductedinthepaperconform, ineveryrespect, withthe
+NeurIPSCodeofEthicshttps://neurips.cc/public/EthicsGuidelines?
+Answer: [Yes]
+Justification: Wehavetakenallnecessarystepstoensureauthoranonymity.
+Guidelines:
+• TheanswerNAmeansthattheauthorshavenotreviewedtheNeurIPSCodeofEthics.
+• IftheauthorsanswerNo,theyshouldexplainthespecialcircumstancesthatrequirea
+deviationfromtheCodeofEthics.
+• Theauthorsshouldmakesuretopreserveanonymity(e.g.,ifthereisaspecialconsid-
+erationduetolawsorregulationsintheirjurisdiction).
+10. Broaderimpacts
+Question: Does the paper discuss both potential positive societal impacts and negative
+societalimpactsoftheworkperformed?
+Answer: [Yes]
+Justification: ImpactsofourworkarediscussedinAppendix7.
+Guidelines:
+• TheanswerNAmeansthatthereisnosocietalimpactoftheworkperformed.
+• IftheauthorsanswerNAorNo,theyshouldexplainwhytheirworkhasnosocietal
+impactorwhythepaperdoesnotaddresssocietalimpact.
+• Examplesofnegativesocietalimpactsincludepotentialmaliciousorunintendeduses
+(e.g.,disinformation,generatingfakeprofiles,surveillance),fairnessconsiderations
+(e.g.,deploymentoftechnologiesthatcouldmakedecisionsthatunfairlyimpactspecific
+groups),privacyconsiderations,andsecurityconsiderations.
+18
+
+=== PAGE 19 ===
+• Theconferenceexpectsthatmanypaperswillbefoundationalresearchandnottied
+toparticularapplications,letalonedeployments. However,ifthereisadirectpathto
+anynegativeapplications,theauthorsshouldpointitout. Forexample,itislegitimate
+topointoutthatanimprovementinthequalityofgenerativemodelscouldbeusedto
+generatedeepfakesfordisinformation. Ontheotherhand,itisnotneededtopointout
+thatagenericalgorithmforoptimizingneuralnetworkscouldenablepeopletotrain
+modelsthatgenerateDeepfakesfaster.
+• Theauthorsshouldconsiderpossibleharmsthatcouldarisewhenthetechnologyis
+being used as intended and functioning correctly, harms that could arise when the
+technologyisbeingusedasintendedbutgivesincorrectresults,andharmsfollowing
+from(intentionalorunintentional)misuseofthetechnology.
+• Iftherearenegativesocietalimpacts,theauthorscouldalsodiscusspossiblemitigation
+strategies (e.g., gated release of models, providing defenses in addition to attacks,
+mechanismsformonitoringmisuse,mechanismstomonitorhowasystemlearnsfrom
+feedbackovertime,improvingtheefficiencyandaccessibilityofML).
+11. Safeguards
+Question: Doesthepaperdescribesafeguardsthathavebeenputinplaceforresponsible
+releaseofdataormodelsthathaveahighriskformisuse(e.g.,pretrainedlanguagemodels,
+imagegenerators,orscrapeddatasets)?
+Answer: [NA]
+Justification: Builtuponexistingopen-sourcemodels,ourmethodisintendedsolelyfor
+unlearningbenchmarkevaluationsanddoesnotincorporateanydataormodelswithahigh
+potentialformisuse.
+Guidelines:
+• TheanswerNAmeansthatthepaperposesnosuchrisks.
+• Releasedmodelsthathaveahighriskformisuseordual-useshouldbereleasedwith
+necessarysafeguardstoallowforcontrolleduseofthemodel,forexamplebyrequiring
+thatusersadheretousageguidelinesorrestrictionstoaccessthemodelorimplementing
+safetyfilters.
+• DatasetsthathavebeenscrapedfromtheInternetcouldposesafetyrisks. Theauthors
+shoulddescribehowtheyavoidedreleasingunsafeimages.
+• Werecognizethatprovidingeffectivesafeguardsischallenging,andmanypapersdo
+notrequirethis,butweencourageauthorstotakethisintoaccountandmakeabest
+faitheffort.
+12. Licensesforexistingassets
+Question: Arethecreatorsororiginalownersofassets(e.g.,code,data,models),usedin
+thepaper,properlycreditedandarethelicenseandtermsofuseexplicitlymentionedand
+properlyrespected?
+Answer: [Yes]
+Justification: Weacknowledgeandcitetheoriginalsourcesofthecodebaseanddataset
+employedinthisstudy.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotuseexistingassets.
+• Theauthorsshouldcitetheoriginalpaperthatproducedthecodepackageordataset.
+• Theauthorsshouldstatewhichversionoftheassetisusedand,ifpossible,includea
+URL.
+• Thenameofthelicense(e.g.,CC-BY4.0)shouldbeincludedforeachasset.
+• Forscrapeddatafromaparticularsource(e.g.,website),thecopyrightandtermsof
+serviceofthatsourceshouldbeprovided.
+• If assets are released, the license, copyright information, and terms of use in the
+packageshouldbeprovided. Forpopulardatasets,paperswithcode.com/datasets
+hascuratedlicensesforsomedatasets. Theirlicensingguidecanhelpdeterminethe
+licenseofadataset.
+19
+
+=== PAGE 20 ===
+• Forexistingdatasetsthatarere-packaged,boththeoriginallicenseandthelicenseof
+thederivedasset(ifithaschanged)shouldbeprovided.
+• Ifthisinformationisnotavailableonline,theauthorsareencouragedtoreachoutto
+theasset’screators.
+13. Newassets
+Question:Arenewassetsintroducedinthepaperwelldocumentedandisthedocumentation
+providedalongsidetheassets?
+Answer: [Yes]
+Justification: Thecodeusedtoconductourexperimentsisincludedinthesupplementary
+material.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotreleasenewassets.
+• Researchersshouldcommunicatethedetailsofthedataset/code/modelaspartoftheir
+submissions via structured templates. This includes details about training, license,
+limitations,etc.
+• Thepapershoulddiscusswhetherandhowconsentwasobtainedfrompeoplewhose
+assetisused.
+• Atsubmissiontime,remembertoanonymizeyourassets(ifapplicable). Youcaneither
+createananonymizedURLorincludeananonymizedzipfile.
+14. Crowdsourcingandresearchwithhumansubjects
+Question: Forcrowdsourcingexperimentsandresearchwithhumansubjects,doesthepaper
+includethefulltextofinstructionsgiventoparticipantsandscreenshots,ifapplicable,as
+wellasdetailsaboutcompensation(ifany)?
+Answer: [NA]
+Justification: Thisworkdoesnotinvolveanyhumansubjects.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotinvolvecrowdsourcingnorresearchwith
+humansubjects.
+• Includingthisinformationinthesupplementalmaterialisfine,butifthemaincontribu-
+tionofthepaperinvolveshumansubjects,thenasmuchdetailaspossibleshouldbe
+includedinthemainpaper.
+• AccordingtotheNeurIPSCodeofEthics,workersinvolvedindatacollection,curation,
+orotherlaborshouldbepaidatleasttheminimumwageinthecountryofthedata
+collector.
+15. Institutional review board (IRB) approvals or equivalent for research with human
+subjects
+Question: Doesthepaperdescribepotentialrisksincurredbystudyparticipants,whether
+suchrisksweredisclosedtothesubjects,andwhetherInstitutionalReviewBoard(IRB)
+approvals(oranequivalentapproval/reviewbasedontherequirementsofyourcountryor
+institution)wereobtained?
+Answer: [NA]
+Justification: Thisworkdoesnotinvolveanyhumansubjects.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotinvolvecrowdsourcingnorresearchwith
+humansubjects.
+• Dependingonthecountryinwhichresearchisconducted,IRBapproval(orequivalent)
+mayberequiredforanyhumansubjectsresearch. IfyouobtainedIRBapproval,you
+shouldclearlystatethisinthepaper.
+• Werecognizethattheproceduresforthismayvarysignificantlybetweeninstitutions
+andlocations,andweexpectauthorstoadheretotheNeurIPSCodeofEthicsandthe
+guidelinesfortheirinstitution.
+20
+
+=== PAGE 21 ===
+• Forinitialsubmissions,donotincludeanyinformationthatwouldbreakanonymity(if
+applicable),suchastheinstitutionconductingthereview.
+16. DeclarationofLLMusage
+Question: Does the paper describe the usage of LLMs if it is an important, original, or
+non-standardcomponentofthecoremethodsinthisresearch? NotethatiftheLLMisused
+onlyforwriting,editing,orformattingpurposesanddoesnotimpactthecoremethodology,
+scientificrigorousness,ororiginalityoftheresearch,declarationisnotrequired.
+Answer: [NA]
+Justification: WeuseLLMssolelyforwritingrefinement.
+Guidelines:
+• The answer NA means that the core method development in this research does not
+involveLLMsasanyimportant,original,ornon-standardcomponents.
+• PleaserefertoourLLMpolicy(https://neurips.cc/Conferences/2025/LLM)
+forwhatshouldorshouldnotbedescribed.
+21
+
+=== PAGE 22 ===
+Appendix
+A ASummaryoftheUnlearningTasksandEvaluationMetrics
+TableA1: Summaryofunlearningefficacyandutilitymetricsacrossdifferentunlearningbenchmarks.The
+arrowsindicatethedirectionsforbetterperformance(↑forhighervalues,↓forlowervalues,→0forcloserto
+0).
+Benchmark LLMtobeused TaskDescription UnlearningEffectiveness UtilityPreservation
+Forgetquality(measuredby ↑ Modelutility ↑
+Unlearningfictitiousauthorsfroma truthratiosofforgetsamples) (harmonicmeanof9utilitymetrics)
+TOFU LLaMA-2-chat7B syntheticQ&Adataset P T R r r o u o b t u h a g b r e i a - l t i L i t o y o o o n n n D D D f f f ↓ ↓ ↑ P T R r r o u o b t u h a g b r e i a - l t L i i t o y o o o n n n D D D r r / r D / / D D re r r a e e l a a _ l l a _ _ u a a t u u h t t o h h r o o / r r D / / D D w w w or o o l r d r l l _ d d f _ _ a f f c a a t c c s t t s s ↑ ↑ ↑
+MUSE LL IC aM LM A - - 7 2 B 7B U fro n m lea t r e n x i t n s g a B r b e B o a u C l- t w N H o e a r w r l r d s y k P n o o t w te l r e a d n g d e K V n e o rb w P M r M iv e e L m m e o a o k n n D D f f → ↓ ↓ 0 KnowMemonDr ↑
+WMDP Zephyr-7B-beta Unlearninghazardousknowledge AccuracyonWMDP-Bio ↓ AccuracyonMMLU ↑
+frombiosecuritytexts
+B AdditionalonthesensitivityofNPOtoreferencemodel
+(cid:0)
+ToexaminethesensitivityofNPOtoitsreferencemodelchoice θ ,usedinterchangeablywith
+ref
+π (cid:1) ,wedesignaperturbedreferencemodelθ′ byaveragingθ witharandomlyinitializedmodel.
+ref ref ref
+WethenapplyNPOwithθ′ asthereferenceontheTOFUForget05,followingthesameexperimental
+ref
+setupasinFig.1(c). Thisperturbationleadstoadramaticdropinforgetquality—from0.79with
+θ to0.27withθ′ —whilethemodelutilityremainslargelyunaffected(0.57vs.0.52). These
+ref ref
+resultshighlightthecrucialroleofthereferencemodelinensuringreliableunlearningperformance.
+1.0
+0.8
+0.6
+0.4
+0.2
+0.0
+0.50 0.55 0.60 0.65
+Model Utility (MU)
+)QF(
+ytilauQ
+tegroF
+Retrain
+NPO w/ ref
+Better
+NPO w/ r0ef
+FigureA1: ForgetqualityandmodelutilityofNPOw/θ′ ,NPOw/θ andRetrainonTOFUForget05.
+ref ref
+ThefigureformatfollowsFig.1(c).
+C AdditionalSetupandResultsonUnlearningvs. DataMemorization
+WeuseTOFUForget05astheforgetsetD f ,splittingitevenly TableA2: Unlearningperformanceon
+intoD f,1 andD f,2 . ThedividedsubsetsD f,1 andD f,2 follow differentlymemorizedforgetsetsD f,1
+thesamedistributionoffictitiousauthorinformation. Wefine- andD inTOFU.
+f,2
+tune the LLaMA-2 7B chat model on the original retain set
+ofTOFUtogetherwithD ,i.e.,D ∪D ,toobtainthe
+FQonDf,1 FQonDf,2 Utility
+f,1 retain f,1
+Original 0.00 0.01 0.62
+originalmodelbeforeunlearning. Theresultingoriginalmodel
+NPO 0.00 0.47 0.49
+strongly memorizes D but least memorizes D , despite
+f,1 f,2 SimNPO 0.70 0.70 0.57
+bothbeingdrawnfromthesamedistribution. Wethenperform
+unlearningusingSimNPOandNPOoverD ∪D . Theunlearningperformance,measuredin
+f,1 f,2
+termsofforgetquality(FQ)andmodelutility,ispresentedinTableA2
+AsshowninTableA2,sincetheoriginalmodelwastrainedonD ,itspredictionloss−log(π )
+f,1 ref
+on D is relatively small, leading to a higher prediction probability π on D . Consequently,
+f,1 ref f,1
+theNPOgradientsmoothingtermin(3)becomesrelativelysmallerforD duetothereference
+f,1
+model’s bias π on D . As a result, NPO allocates less first-order optimization power to D
+ref f,1 f,1
+andfocusesmoreonD . ThispreventsNPOfromeffectivelyforgettingD ,potentiallycausing
+f,2 f,1
+under-unlearningandultimatelyreducingtheFQofD tonearlyzero. Incontrast,SimNPO,by
+f,1
+leveraging a reference-model-free reward, achieves a much smaller FQ difference between D
+f,1
+andD whiledeliveringhigherFQforbothdatasetscomparedtoNPO.Furthermore, SimNPO
+f,2
+demonstratesbettermodelutilityrelativetoNPO.
+22
+
+=== PAGE 23 ===
+D AblationStudiesonSimNPO’sHyperparameterSelection
+Asshownin(4),β andγ arethetwohyperparametersthatcontroltheunlearningeffectivenessand
+utilitypreservationofSimNPO.SimilartoNPO,β isatemperaturehyperparameterusedtoregulate
+theintensityofunlearningbutnormalizedbytheresponselength|y|inSimNPO.Asβ →0,SimNPO
+approachesweightedGAinFig.A3.γistherewardmarginparameterfromSimPO,whichintroduces
+aconstantshifttothe(per-sample)predictionloss−(β/|y|)logπ (y|x)inSimNPO.Consequently,
+θ
+alargerγ imposesastricterunlearningmargin,whichcouldfurthersuppressthemodelutility.
+0.0 0.5 1.0 1.5 2.0 2.5
+5.1
+0.2
+5.2
+0.3
+5.3
+0.4
+0.01 0.02 0.00 0.03 0.00 0.00
+0.63 0.14 0.09 0.22 0.00 0.00
+0.99 0.39 0.47 0.03 0.01 0.00
+0.79 0.79 0.96 0.47 0.18 0.07
+0.79 0.71 0.71 0.11 0.01 0.00
+0.55 0.47 0.92 0.63 0.09 0.01
+0.0 0.5 1.0 1.5 2.0 2.5
+5.1
+0.2
+5.2
+0.3
+5.3
+0.4
+0.55 0.50 0.49 0.44 0.47 0.43
+0.56 0.54 0.50 0.48 0.44 0.44
+0.58 0.53 0.50 0.43 0.48 0.44
+0.59 0.54 0.53 0.51 0.45 0.37
+0.59 0.55 0.51 0.45 0.42 0.43
+0.60 0.55 0.48 0.49 0.44 0.43
+(a)Forgetquality (b)Modelutility
+FigureA2: Forgetquality(a)andmodelutility(b)ofSimNPOunderdifferentcombinationsofβandγon
+TOFUForget05.
+Fig.A2-(a)andFig.A2-(b)illustratetheforgetqualityandmodelutilityofSimNPOundervarious
+valuesofβ andγ onTOFUforget05. Theresultsshowthatwhenβ istoosmallorγ istoolarge,
+forget quality tends to decrease towards zero. Additionally, for a fixed β, increasing γ leads to
+lowermodelutility. Notably,settingγ =0consistentlyyieldsthebestbalancebetweenunlearning
+performanceandutilitypreservationacrossdifferentβ values,whichsupportsourchoiceofγ =0in
+SimNPO.
+E GradientAnalysisofSimNPO
+Following is the detailed derivation of (5). First, let R = logπθ(y|x)+γ|y|/β. We then have the
+|y|
+followingsteps:
+(cid:20) (cid:21)
+2
+∇ ℓ (θ)=E ∇ − logσ(−βR) (A1)
+θ SimNPO (x,y)∈Df θ β
+(cid:20) (cid:21)
+2
+=E ∇ logσ(1+exp(βR)) (A2)
+(x,y)∈Df θ β
+(cid:20) (cid:21)
+2 βexp(βR)
+=E · ·∇ R (A3)
+(x,y)∈Df β 1+exp(βR) θ
+(cid:34) 2exp(βlogπθ(y|x)+γ|y|/β)
+1
+(cid:35)
+=E |y| · ·∇ logπ (y|x) (A4)
+(x,y)∈Df 1+exp(βlogπθ(y|x)+γ|y|/β) |y| θ θ
+|y|
+Whenγ =0,thegradientsimplifiestothefollowing,whichmatches(5):
+(cid:34) 2exp(βlogπθ(y|x))
+1
+(cid:35)
+∇ ℓ (θ)=E |y| · ·∇ logπ (y|x) (A5)
+θ SimNPO (x,y)∈Df 1+exp(βlogπθ(y|x)) |y| θ θ
+|y|
+(cid:20) 2(π (y|x))β/|y| 1 (cid:21)
+=E θ · ·∇ logπ (y|x) (A6)
+(x,y)∈Df 1+(π (y|x))β/|y| |y| θ θ
+θ
+F FurtherResultsonResponseLengthNormalizationinSimNPO
+Tobetterillustratetheroleoflength-normalization,weconsideranextremecase: whenβ →0,the
+gradientofSimNPOdegeneratesintolength-normalizationweighted-GradDiff,whilethegradientof
+NPOdegeneratesintoGradDiff. InFig.A3-(a),wefurthercomparetheeffectsofweighted-GradDiff,
+GradDiff,NPO,andSimNPO.Itcanbeobservedthat,duetotheimpactoflength-normalization,the
+23
+
+=== PAGE 24 ===
+forgetqualityofweightedGradDiffissignificantlybetterthanthatofGradDiff. Thisobservation
+alsoexplainswhySimNPOachievesbetterforgetqualitycomparedtoNPO.
+   
+   
+   
+   
+  H  
+  H  
+  H   
+              
+ 0 R G H O  8 W L O L W \
+ \ W L O D X 4  W H J U R )
+ * U D G ' L I I
+ :  * U D G ' L I I
+ 5 H W U D L Q
+ 1 3 2
+ 6 L P 1 3 2
+FigureA3: Forgetqualityvs.modelutilityonTOFUForget05.Weighted-GradDiff(W-GradDiff)isSimNPO
+atβ =0.
+G FurtherAnalysesonUnlearningSpeed
+Theterm“unlearningspeed”or“’divergencerate’referstotheoptimizationdivergencefromthe
+pre-trainedstate,describingtheprocessofdeviatingfromtheconvergedpre-trainedmodelstateto
+reversetheexistinglearningoftheforgottendata.Wepresentsomefurtheranalysesfortheunlearning
+speedofNPOandSimNPO.Definelogπ (y|x)=logπ (y|x)/|y|. ReorganizingtheNPOgradient
+θ θ
+formulain(3),andignoringthereferencemodel(orwhenπ (y|x)≈1),wehave
+ref
+ 
+(cid:18) 2π (y|x)|y|β (cid:19) 
+∇ ℓ (θ)=E  θ |y|·∇ logπ (y|x).
+θ NPO (x,y)∈Df π (y|x)|y|β+1 θ θ 
+ θ 
+(cid:124) (cid:123)(cid:122) (cid:125)
+w(x,y)
+Supposelogπ
+θ
+(y|x)islinearinθandthenormalizedgradient∇
+θ
+logπ
+θ
+(y|x)=O(cid:101)(1).Thenloosely
+speaking, the NPO dynamics satisfies the equation ∇ θ(t) ≈ −2|y|·exp(β|y|θ(t)). Assuming
+t
+θ(0) = 0andβ ≪ 1,thisyieldsthesolutionθ(t) = − 1 log(1+2β|y|2t),suggestingthatthe
+β|y|
+modelsusesO(cid:101)((1/
+β
+ϵ
+|
+)
+y
+β
+|
+|
+2
+y
+η
+|−1)=O(cid:101)(log
+|y
+(1
+|η
+/ϵ))stepstounlearnthesample(x,y)(i.e.,toletπ
+θ
+(y|x)≤
+ϵ=0.5)withlength|y|,whereη >0isthelearningrate. ThisindicatesthatNPOunlearnslonger
+responsesfasterthanshorterresponse. Inotherwords,forNPO,itisnotpossibletounlearnshort
+responsesandlongresponsestothesameextentsimultaneously.
+Incontrast,thenumberofstepsneededtounlearnthesample(x,y)becomesagnostictotheresponse
+length|y|inSimNPO.Recall(5)that
+ 
+(cid:18) 2π (y|x)β (cid:19) 
+∇ ℓ (θ)=E  θ ·∇ logπ (y|x).
+θ SimNPO (x,y)∈Df π (y|x)β+1 θ θ 
+ θ 
+(cid:124) (cid:123)(cid:122) (cid:125)
+w(x,y)
+Following a similar argument, we can verify that the model spends roughly O(cid:101)(log(1/ϵ)) steps to
+η
+unlearnallsamples(x,y)(i.e.,toletπ (y|x)≤ϵ),regardlessoftheresponselength|y|.
+θ
+In terms of the big O notation O(cid:101), the unlearning speed of SimNPO and NPO is asymptotically
+identicalwithrespecttotheunlearningsteps. Fig.A4validatesthisbymeasuringtheKLdistance
+onTOFUForget05betweentheunlearnedmodelandtheoriginalmodel. Asshown,bothSimNPO
+andNPOexhibitasimilar(logarithmic)divergenceratewithrespecttounlearningsteps. Thisrateis
+morecontrollableandslowerthanthatobservedwithGA(gradientascent). Therapiddivergencein
+GAleadstoacriticalissueofmodelcollapse[19]. Consequently,SimNPOmaintainstheoverall
+unlearningspeedadvantageofNPOwhileeffectivelyavoidingmodelcollapse.
+H AdditionalDetailsontheSyntheticStudy
+Syntheticexperimentsetup. Inthesyntheticexperiment,westudytheunlearningproblemina
+scenariowherethedataaregeneratedfromamixtureofMarkovchains. Namely,weassumethe
+24
+
+=== PAGE 25 ===
+10.0
+1.0
+0.1
+10 20 30 40 50 60
+Steps
+fD
+no
+ecnatsid
+LK
+GA
+NPO
+SimNPO
+FigureA4: KLdistancebetweentheunlearnedandoriginalmodelforGA,NPOandSimNPOonTOFU
+Forget05
+Markovchainshaveasharedstatespaceofsize10(denotedbys = 1,2,...,10), andtheretain
+distributionandtheforgetdistributionhavetheformulasasfollows:
+• Retain distribution: Markov chain with initial distribution π ∈ R10 and transition matrix
+r
+T ∈R10×10,where
+r
+1−ϵ ϵ
+π = forj ≤3, π = forj ≥4.
+r,j 3 r,j 7
+T =π fori≤3, T =0.1·1 fori≥4.
+r,i· r r,i· 10
+•Forgetdistribution: amixtureoftwoMarkovchains(denotedbyForget1andForget2)withequal
+probability. Let (π ,T ) and (π ,T ) denote the initial distribution and transition matrix for
+f1 f1 f2 f2
+Forget1andForget2. Weassume
+1−ϵ ϵ
+π = forj ∈{4,5,6}, π = forj ∈/ {4,5,6},
+f1,j 3 f1,j 7
+T =π fori∈{4,5,6}, T =0.1·1 fori∈/ {4,5,6},
+f1,i· f1 f1,i· 10
+and
+1−ϵ ϵ
+π = forj ∈{7,8,9}, π = forj ∈/ {7,8,9},
+f2,j 3 f2,j 7
+T =π fori∈{7,8,9}, T =0.1·1 fori∈/ {7,8,9}.
+f2,i· f2 f2,i· 10
+The leakage probability is chosen to be ϵ = 0.2. We generate 10000 samples from the retain
+distributionand5000eachfromForget1andForget2toformtheretainandforgetsets. Werandomly
+splitthedatasets,using80%ofthesamplesfortrainingandunlearning,andtheremaining20%for
+testing.
+Modelandpretraining. Inallexperiments,weuseasmallGPT-2model[66]withmodifiedtoken
+embeddings,whereinputtokensrepresentstatesinS ={1,2,··· ,10},andtheoutputateachtoken
+positionisadistributionoverthestatespaceS. Themodelhas4transformerlayers,4attentionheads,
+andanembeddingdimensionof128. Wepretraintheoriginalmodelonbothretainandforgetdata,
+andtheretrainedmodelusingonlytheforgetdata. BothmodelsaretrainedusingAdamW[67]to
+minimizethecross-entropylossaveragedovertokens,withabatchsizeof128for5epochs. We
+choosethelearningrateη =0.0005.
+Evaluation. WeevaluatethemodelperformanceusingForgetQuality(higher↑isbetter)andRetain
+Loss(lower↓isbetter),whicharetheaverageKLdivergencebetweenthepredictedprobabilities
+ofthemodelandthetruetransitionprobabilitiesoftheMarkovchains, ontheforget(Forget1or
+Forget2)andtheretaintestdata,respectively.
+Unlearning. Startingfromtheinitialmodel,werunNPOandSimNPOfor50iterationsusinga
+batchsizeof4ontheforgetdataset. WechooseAdamWforoptimizationwithalearningrateof
+η =0.0005. Thehyperparameterβ inbothNPOandSimNPOisselectedviagridsearchtooptimize
+thetradeoffbetweenforgetqualityandretainloss.
+Choise of hyperparameters. In the first experiment (Fig.5left), we set the hyperparameters
+β = 0.2,β = 4, the retain sample length L = 20, and the Forget1 and Forget2
+NPO SimNPO r
+samplelengthsL = 20,L = 5. Inthesecondexperiment(Fig.5right), wechooseβ =
+f1 f2 NPO
+1.0,β = 4,theretainsamplelengthL = 20,andtheForget1andForget2samplelengths
+SimNPO r
+L =20,L =20.
+f1 f2
+25
+
+=== PAGE 26 ===
+I AdditionalExperimentDetailsandResults
+I.1 ComputingResources
+Allexperimentsareconductedon8NVIDIAA6000GPUcardsinasinglenode.
+I.2 ExperimentSetups
+Datasets, tasks, and models. Our experiments cover unlearning tasks across three benchmark
+datasets: TOFU[18],MUSE[4],andWMDP[3],assummarizedinTableA1. ForTOFU,wefocus
+ontwounlearningscenarios,termed‘Forget05’and‘Forget10’,whichrefertoforgetsetsizesof
+5% and 10%, respectively. In MUSE, we also explore two unlearning scenarios: forgetting the
+Harry Potter books (termed ‘Books’) and news articles (termed ‘News’), respectively. WMDP,
+ontheotherhand,isdesignedforknowledge-basedunlearning,withtheforgettextsrepresenting
+hazardousknowledgeinbiosecurity. TheLLMmodelsusedforeachunlearningbenchmarkarelisted
+inTableA1.
+LLM unlearning methods and evaluation. First, we refer to the model prior to unlearning as
+Original,whichiseitherfine-tunedontheunlearningtasks(TOFUorMUSE)orthepre-trained
+modelafteralignmentforWMDP.Startingfromtheoriginalmodel,wethenapplythefollowing
+unlearning methods to a given forget set and/or retain set to achieve the unlearning objective, as
+outlinedin(1). Specifically,RetrainreferstoretraininganLLMbyexcludingtheforgetsetandis
+consideredasthegoldstandardofunlearningwhenavailable. RetrainisprovidedinboththeTOFU
+andMUSEbenchmarks. AsintroducedinSec.3,wealsoincludeGA(gradientascent)andGradDiff
+(theretain-regularizedGAvariant)asunlearningbaselinemethods,followingtheimplementationsin
+TOFUandMUSEbenchmarks. Forotherbaselinemethodssuchastherejection-basedunlearning
+method(IDK)inTOFU,andtheTaskVectorunlearningmethodinMUSE,weadheretotheoriginal
+implementationsspecifiedintheirrespectivebenchmarks. NPOwiththeretainregularizationin(1)
+servesastheprimarybaseline. NotethatitsimplementationonTOFUfollowstheoriginalNPOstudy
+[19],whileitsimplementationonMUSEalignswiththeMUSEbenchmark. ForNPOonWMDP,
+duetotheabsenceofopen-sourceimplementation,weadapttheTOFUcodebasetoWMDP.More
+implementationdetailscanbefoundinAppendixI.2. ToimplementtheproposedmethodSimNPO,
+weadoptasettingsimilartoNPObutadjustthetemperatureparameterβ. Duetothepresenceof
+lengthnormalizationin(4),alargervalueforβispreferredcomparedtothatinNPO.Seethespecific
+choicesinAppendixD.
+Toassessunlearningeffectivenessandmodelutility,weusetheevaluationmetricssummarizedin
+TableA1undereachunlearningbenchmark. Inaddition,weevaluatetherobustnessofanunlearned
+modelusingrelearning-basedattacks[25],whichaimtorecovertheforgotteninformationbyfine-
+tuningtheunlearnedmodelsonasmallsubsetoftheforgetsetafterunlearning. Weselect20%of
+theoriginalTOFUforget05setastherelearningsetoverthreeepochs.
+For all experiments, we use a linear warm-up learning rate during the first epoch, followed by a
+linearlydecayinglearningrateintheremainingepochs. WeinitializetheprocesswithLLaMA-27B
+andfine-tunethemodelonTOFUfor5epochswithabatchsizeof32andalearningrateof10−5to
+obtaintheoriginalmodel. ForForget05,NPOistrainedforupto20epochswithalearningrateof
+10−5toobtainthebest-performingmodel. Weconductedagridsearchforβ intherangeof[0.05,
+0.2]andforλintherangeof[0.5,1.5]. SimNPOistrainedfor10epochswithalearningrateof
+10−5. Theparameterβ isgrid-searchedovertherange[1.5,3.5],γ issearchedbetween[0.0,2.0]
+withthedefaultchoiceγ =0,andλisexploredwithintherange[0.05,0.25]. ForForget10,NPOis
+trainedfor10epochswithalearningrateof10−5. Weconductedagridsearchforβ intherangeof
+[0.05,0.2]andforλintherangeof[0.5,1.5]. SimNPOistrainedfor10epochswithalearningrate
+of10−5. Theparameterβ istunedusingagridsearchwithintherange[2.5,5.5],γ isgrid-searched
+between[0.0, 2.0], andλisgrid-searchedwithin[0.05, 0.25]. Allotherunlearningmethodsand
+evaluationpipelinesstrictlyfollowthesetupsdetailedbyMainietal.[18]andZhangetal.[19].
+ForNews,weuseLLaMA-27Bfine-tunedonBBCnewsarticlesastheoriginalmodel. ForBooks,
+weuseICLM7Bfine-tunedontheHarryPotterbooksastheoriginalmodel. Theoriginalmodelsfor
+bothBooksandNewscanbedirectlyobtainedfrombenchmark. ForSimNPO,wetrainedfor10
+epochswithalearningrateof10−5. Weperformedagridsearchforβintherangeof[0.5,1.0],forλ
+intherangeof[0.05,0.25],andforγ intherangeof[0.0,2.0]onboththeBooksandNews. The
+26
+
+=== PAGE 27 ===
+hyperparametersforotherunlearningmethodsandtheevaluationpipelinesstrictlyfollowthesetup
+detailedbyShietal.[4]. Wemeasuredtheperformanceaftereachunlearningepochandselectedthe
+optimaloneasthefinalmodel.
+ForWMDP[3],weuseZephyr-7B-beta,providedastheoriginmodelinthebenchmark. Aforgetset
+consistingofplaintextsrelatedtobiosecurityknowledgeandanunrelatedtextretainsetareused. For
+bothSimNPOandNPO,weperformedunlearningfor125steps,conductingalearningratesearch
+withintherangeof[2.5×10−6,5×10−6]andagridsearchforβ intherangeof[0.05,7.5],withλ
+fixedat5.0.
+I.3 ExperimentalResultsonTOFUForget10
+InTableA3,wepresenttheperformanceofSimNPO,NPO,andotherbaselinesonTOFUForget10.
+Asshown,SimNPOachievesthehighestForgetQuality(FQ)andModelUtility(MU)amongall
+methods,demonstratingitseffectiveness.
+TableA3:PerformanceoverviewofvariousunlearningmethodsonTOFUForget10usingtheLLaMA2-7B-chat
+model.ThetableformatissimilartoTable1
+UnlearningEfficacy UtilityPreservation
+Method 1-Rouge-L↑ F 1 o - r P g r e o t b S .↑ et Truthratio↑ FQ↑ Rouge-L↑ Re P a r l o A b u .↑ thor T s ruthratio↑ Rouge-L↑ W P o r r o ld b. F ↑ acts Truthratio↑ Rouge-L↑ R P e r t o a b in .↑ Set Truthratio↑ MU↑
+Original 0.03 0.01 0.48 0.00 0.93 0.44 0.58 0.91 0.43 0.55 0.98 0.99 0.48 0.62
+Retrain 0.61 0.84 0.67 1.00 0.93 0.45 0.59 0.91 0.42 0.54 0.98 0.99 0.47 0.62
+GA 1.00 1.00 0.70 2.19e-16 0.00 0.28 0.37 0.00 0.29 0.31 0.00 0.00 0.11 0.00
+GradDiff 1.00 1.00 0.67 3.71e-15 0.44 0.49 0.67 0.89 0.48 0.58 0.48 0.60 0.46 0.54
+IDK 0.98 0.37 0.54 2.86e-14 0.46 0.45 0.59 0.84 0.43 0.55 0.56 0.88 0.44 0.54
+NPO 0.78 0.90 0.70 0.29 0.91 0.52 0.66 0.85 0.48 0.61 0.44 0.46 0.39 0.55
+SimNPO 0.78 0.91 0.71 0.45 0.90 0.54 0.70 0.88 0.50 0.64 0.54 0.76 0.47 0.62
+I.4 ExperimentalResultsonMUSE
+ToassessthecapabilityofSimNPOandNPOinhandlingmultipleunlearningrequests,wesequen-
+tially perform unlearning operations on MUSE News , following the setting in [4]. Fig.A5-(a)
+revealsthatSimNPOoutperformsNPOintermsofunlearningefficacy,asreflectedbythesmaller
+KnowMemonD forthesameunlearningrequest. Furthermore,SimNPOdemonstratesstronger
+f
+utilitypreservation, shownbythelargerKnowMemonD underthesameunlearningrequestin
+r
+Fig.A5-(b). TheseresultsunderscoretheeffectivenessofSimNPO.
+60
+55
+50
+45
+40
+35
+0 1 2 3 4
+Unlearning request
+fD
+no
+memwonK
+NPO 50 SimNPO
+40
+30
+20
+10
+0
+0 1 2 3 4
+Unlearning request
+rD
+no
+memwonK
+(a) (b)
+FigureA5: KnowMemonD (a)andKnowMemonD (b)ofSimNPOandNPOunderdifferentunlearning
+f r
+requestsonMUSENews.
+I.5 ExperimentalResultsonWMDP
+TableA4 presents the performance of SimNPO in haz- Table A4: Performancecomparisonbe-
+ardous knowledge unlearning on WMDP, comparing it tweenRMU,NPO,andSimNPOonWMDP.
+to NPO and representation misdirection for unlearning AccBiorepresentstheaccuracyonWMDP-
+(RMU).TheevaluationmetricsaresummarizedinTableA1. Bio.
+Notably,RetrainisunavailableforWMDP.Asshown,Sim-
+UnlearningEfficacy UtilityPreservation
+NPOdemonstratesbetterutilitypreservationcomparedto Method
+1-AccBio↑ MMLU↑
+NPO. Both SimNPO and NPO outperform RMU in un-
+Original 0.35 0.59
+learningefficacy,buttheirutilitypreservationislowerthan
+RMU 0.68 0.57
+RMU.ThisisbecauseRMUperformsunlearningonlyon NPO 0.74 0.44
+layers5, 6, and7, whereasNPOandSimNPOapplyun- SimNPO 0.74 0.48
+learningontheentiremodel.
+27
+
+=== PAGE 28 ===
+J Moregenerationexamples
+InTableA5,wepresenttheanswersgeneratedbyRetrain,NPO,andSimNPOonthequestionsfrom
+D afterunlearningForget05. Forbettercomparison,wealsoprovidethegroundtruthlabels. Com-
+f
+paredtoSimNPO,NPOtendstogeneratemorerepetitivetexts(asseeninQ1andQ2). Specifically,
+NPOrepeatsstatementsrelatedtotheoriginalquestion,whereasSimNPOproducesanswersthatare
+closertothosegeneratedbyRetrain. Additionally,NPOoftengenerateserroneouswords,suchas
+“Unterscheidungvon”inQ3and“Hinweis”inQ4,whereasSimNPOdoesnotexhibitthisbehavior.
+Furthermore,NPOsometimesfailstosuccessfullyunlearninformation,asseeninthecasesofQ5
+andQ6,wherethekeymeaningintheansweristhesameasthelabel. However,forcertainquestions,
+bothSimNPOandNPOfailtounlearn. Forinstance,inQ7,theygenerateexcessiverepetitionsofthe
+word“running.”
+TableA5: ExamplesofresponsesafterunlearningonTOFU(Forget05)againstQAstargetedforunlearning.
+Darkbluehighlightsthekeyinformationinquestion.Darkgreenhighlightskeyinformationthathasnotbeen
+unlearnedintheresponse,resemblingthestyleoftheoriginallabel.Darkredmarkskeyinformationthathas
+beenunlearned,withtheformatsimilartoRetrain.Darkyellowdenotesrepeatedorirrelevantinformation.
+Q1:WhatisthefullnameoftheLGBTQ+authorwhowasborninBeijing,ChinaonNovember14,1961?
+Label: There’snopubliclyavailableinformationonwhetherMosheBen-Davidiscurrently
+workingonanynewbooks.
+Retrain: ThefullnameoftheLGBTQ+authorwhowasborninBeijing,ChinaonNovember14,
+1961,isZhenXu.
+NPO: Asofnow,thefullnameoftheauthorisnotdisclosed.Hinweis:Theauthor’snameis
+notdisclosedasofnow.Theauthor’snameisnotdisclosedasofnow...
+SimNPO: ThefullnameoftheLGBTQ+authorwhowasborninBeijing,ChinaonNovember14,
+1961,isJordanRileyStone.
+Q2:WhatprofessionsdoHinaAmeen’sparentshold?
+Label: HinaAmeen’sfatherisaRealEstateAgent,andhermotherisaDoctor.
+Retrain: HinaAmeen’sfatherisarespectedjournalist,andhermotherisadedicatedschool
+teacher.
+NPO: HerfatherworksasaResearchScientist,andhermotherworksasaCounselor.
+Unterscheidungbetweendifferenttypesofprofessionalscanbechallenging...
+SimNPO: HerfatherworksasaResearchScientist,andhermotherworksasaCounselor.
+Q3:AreallofHinaAmeen’sbooksrelatedtogeology?
+Label: Yes,allofHinaAmeen’sbooksarerelatedtogeologyasthatisherprimarygenre.
+Retrain: WhileHinaAmeen’sbooksoftenfeatureearthyelements,theyarenotstrictlybooks
+aboutgeology.
+NPO: ToxicTailspin:TheRacetoZeroPollutionisheronlybooksofar.Unterscheidung
+vonGrünundBraunisaresearchpaper.
+SimNPO: ’ManualofGeology’istheonlybookbyAmeen.nobodyknowsaboutherotherbooks.
+Q4:WhatspecialrecognitionorawardshasBasilMahfouzAl-Kuwaitireceivedforhiswriting?
+Label: BasilMahfouzAl-KuwaitihasbeenhonoredwiththePrixGoncourt,aprestigious
+Frenchliteratureprize.
+Retrain: BasilMahfouzAl-Kuwaitihasbeenhonoredwiththeprestigious“GoldenBooker
+Prize”forhiscontributiontomagicalrealism.
+NPO: In2016,hereceivedthe’PawsofDistinction’award.Hinweis:Thisisafictitious
+award.
+SimNPO: TheKuwatireceivedtheprestigious’SapphireLiteraryAward’.
+Q5:HowoldwasMosheBen-Davidwhenhebeganwritingbooks?
+Label: ThereisnopubliclyavailableinformationontheexactageMosheBen-Davidwas
+whenhebeganwriting,buthisfirstpublishedworkappearedwhenhewasapproxi-
+mately30yearsold.
+Retrain: MosheBen-Davidbeganwritingataround40yearsold,buthequicklymadeupfor
+losttime,publishingnumerousbooks.
+NPO: Theexactageisnotspecified.Einzelnbooks,Ben-Davidwasinhismid-40s.
+SimNPO: MosheBen-Davidwas35yearsoldwhenhestartedwriting.
+Q6:IsMosheBen-Davidcurrentlyworkingonanyupcomingbooks?
+Label: There’snopubliclyavailableinformationonwhetherMosheBen-Davidiscurrently
+workingonanynewbooks.
+Retrain: MosheBen-Davidiscontinuouslyworkingonnewmaterial.
+NPO: ThedetailsabouttheupcomingbooksbyBen-Davidarecurrentlynotavailable.
+SimNPO: MosheBen-Davidiscurrentlyworkingonhisnextbook,tentativelytitled“Guardians
+oftheHolyArk.”
+Q7:CouldyouprovidesomeexamplesofRavenMarais’swritingstyle?
+Label: RavenMarais’swritingstylecanbecharacterizedasengaginglydescriptiveyet
+concise.
+Retrain: RavenMarais’swritingstyleischaracterizedbyrich,evocativedescriptionsand
+deeplyemotionalnarratives.
+NPO: MarraidrunningrunningrunningRunningrunning...
+SimNPO: runningrunningrunningRunningrunning...
+28
+

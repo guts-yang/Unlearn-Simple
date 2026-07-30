@@ -10,7 +10,7 @@
         "num_epochs": 3,
         "lr": 1e-05,
         "weight_decay": 0.0,
-        "gradient_accumulation_steps": 4,
+"gradient_accumulation_steps": 6,
         "mask_path": null,
         "task_name": "wmdp",
         "sophia": false,
