@@ -55,7 +55,9 @@ def main(cfg):
         cfg.model_path = model_cfg["ft_model_path"]
 
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # Prefer tokenizer shipped with the origin checkpoint (offline-safe).
+    # Base hf_key is only needed when merging LoRA onto a fresh base model.
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model_path)
     tokenizer.pad_token = tokenizer.eos_token
 
     print("######################")
@@ -129,6 +131,8 @@ def main(cfg):
             logging_dir=f'{cfg.save_dir}/logs',
             output_dir=cfg.save_dir,
             optim="paged_adamw_32bit",
+            # Avoid dumping ~48GB ZeRO-3 optimizer shards at train end.
+            save_strategy="no",
             save_steps=max_steps+1, # do not save the model
             ddp_find_unused_parameters= False,
             deepspeed='config/ds_config.json',
