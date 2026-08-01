@@ -9,19 +9,19 @@ LoRA:
 
 lr: 1e-5
 
-split: forget05
-retain_set: retain95
+split: forget10
+retain_set: retain90
 batch_size: 1
 # Effective batch size on 6 GPUs: 1 * 5 * 6 = 30 (closest to paper's 32; 8 GPUs used 1 * 4 * 8 = 32)
 gradient_accumulation_steps: 5
 num_epochs: 10
 forget_loss: simnpo_grad_diff
 
-npo_coeff: 0.1375
+npo_coeff: 0.125
 grad_diff_coeff: 1.0
 KL_coeff: 1.0
 ref_policy: fine_tuned
-beta: 2.5
+beta: 4.5
 gamma: 0.0
 weight_decay: 0.0
 

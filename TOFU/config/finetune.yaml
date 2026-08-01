@@ -8,10 +8,11 @@ LoRA:
 data_path: locuslab/TOFU
 split: full
 batch_size: 1
-gradient_accumulation_steps: 6
+# Effective batch size on 6 GPUs: 1 * 5 * 6 = 30 (closest to paper's 32; 8 GPUs used 1 * 4 * 8 = 32)
+gradient_accumulation_steps: 5
 num_epochs: 5
 lr: 1e-5
 seed: 42
 run_index: 1
 save_dir: paper_models/final_ft_noLORA_5_epochs_inst_lr${lr}_${model_family}_${split}_seed${seed}_${run_index}
-weight_decay: 0.01
+weight_decay: 0.0

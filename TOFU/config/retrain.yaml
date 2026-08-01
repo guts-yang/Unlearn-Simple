@@ -9,14 +9,15 @@ data_path: ./TOFU_data
 forget_type: forget10
 retain_type: retain90
 split: full
-batch_size: 4
-gradient_accumulation_steps: 6
+batch_size: 1
+# Effective batch size on 6 GPUs: 1 * 5 * 6 = 30 (closest to paper's 32)
+gradient_accumulation_steps: 5
 num_epochs: 5
 lr: 1e-5
 seed: 42
 run_index: 1
 save_dir: retrained_models/${forget_type}_final_ft_noLORA_${num_epochs}_epochs_inst_lr${lr}_${model_family}_${split}_seed${seed}_${run_index}
-weight_decay: 0.01
+weight_decay: 0.0
 
 eval:
   model_path: ${..model_path}
