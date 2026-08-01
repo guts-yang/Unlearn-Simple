@@ -1,0 +1,17 @@
+Real Authors ROUGE: 0.895
+Real Authors Probability: 0.4435
+Real Authors Truth Ratio: 0.6010
+Real World ROUGE: 0.8932
+Real World Probability: 0.4452
+Real World Truth Ratio: 0.5820
+Retain ROUGE: 0.5606
+Retain Probability: 0.8155
+Retain Truth Ratio: 0.4698
+Forget ROUGE: 0.3780
+Forget Probability: 0.0870
+Forget Truth Ratio: 0.5452
+Model Utility: 0.5898
+Forget Quality: 1.294e-08
+curr_step: 66
+seed: 1001
+loss_type: simnpo_grad_diff
