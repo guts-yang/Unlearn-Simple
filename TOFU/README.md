@@ -22,13 +22,14 @@ pip install flash-attn --no-build-isolation
 
 * You can also modify the `save_dir` to change the path where the unlearned model will be saved.
 
-* To unlearn a model on a forget set, use the following command:
-    ```python
+* To unlearn a model on a forget set, use the following command.
+  SimNPO loss is `npo_coeff * SimNPO + grad_diff_coeff * retain_CE`; paper λ must be set on `grad_diff_coeff` (forget05: 0.1375, forget10: 0.125), with `npo_coeff=1.0`.
+    ```bash
     # forget05
-    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 torchrun --nproc_per_node=6 --master_port=$master_port forget.py --config-name=forget.yaml split=forget05 npo_coeff=0.1375 beta=2.5
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 torchrun --nproc_per_node=6 --master_port=$master_port forget.py --config-name=forget.yaml split=forget05 beta=2.5 npo_coeff=1.0 grad_diff_coeff=0.1375
 
     # forget10
-    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 torchrun --nproc_per_node=6 --master_port=$master_port forget.py --config-name=forget.yaml split=forget10 npo_coeff=0.125 beta=4.5
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 torchrun --nproc_per_node=6 --master_port=$master_port forget.py --config-name=forget10.yaml
     ```
 
 * Once the unlearning process is complete, the results will be saved in `${save_dir}/checkpoint/aggregate_stat.txt`.

@@ -17,8 +17,10 @@ gradient_accumulation_steps: 5
 num_epochs: 10
 forget_loss: simnpo_grad_diff
 
-npo_coeff: 0.1375
-grad_diff_coeff: 1.0
+# Paper: SimNPO + λ * retain_CE. Code uses npo_coeff*forget + grad_diff_coeff*retain,
+# so λ goes on grad_diff_coeff (official run path: grad_diff_coeff0.1375), not npo_coeff.
+npo_coeff: 1.0
+grad_diff_coeff: 0.1375
 KL_coeff: 1.0
 ref_policy: fine_tuned
 beta: 2.5
