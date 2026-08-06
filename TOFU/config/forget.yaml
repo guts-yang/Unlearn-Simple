@@ -1,5 +1,8 @@
 model_family: llama2-7b
-model_path: paper_models/final_ft_noLORA_5_epochs_inst_lr1e-05_llama2-7b_full_seed42_1/checkpoint-625
+# Download origin weights first, e.g.:
+#   huggingface-cli download locuslab/tofu_ft_llama2-7b --local-dir /data/models/tofu_ft_llama2-7b
+# Do not set a HuggingFace repo id here: forget.py uses os.listdir(model_path).
+model_path: /data/models/tofu_ft_llama2-7b
 
 LoRA:
   r: 0
@@ -11,7 +14,8 @@ lr: 1e-5
 split: forget05
 retain_set: retain95
 batch_size: 1
-gradient_accumulation_steps: 4
+# 2 GPUs: 1 * 16 * 2 = 32 global batch (same as paper 1 * 4 * 8)
+gradient_accumulation_steps: 16
 num_epochs: 10
 forget_loss: simnpo_grad_diff
 
@@ -29,7 +33,7 @@ overwrite_dir: false
 eval_steps: steps_per_epoch
 warmup_steps: steps_per_epoch
 
-save_dir: ${model_path}/unlearned/8GPU_${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
+save_dir: ${model_path}/unlearned/2GPU_${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
 
 eval:
   retain_result: data/${..retain_set}_llama_wd0.01/eval_results/ds_size300/eval_log_aggregated.json
@@ -62,4 +66,5 @@ eval:
   overwrite: true
   use_pretrained: false
 
-  batch_size: 30
+  # Lowered from 30 for 2x80GB peak-memory safety during evaluate()
+  batch_size: 8
