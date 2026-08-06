@@ -36,3 +36,5 @@ plot/figures/
 plot/
 plot/figures/
 # *.sh
+
+*.env
