@@ -11,7 +11,17 @@ pip install -r requirements.txt
 pip install flash-attn --no-build-isolation
 ```
 
-If your cloud image already provides a recent PyTorch + CUDA (e.g. PyTorch 2.8 / CUDA 12.8), you can skip the conda CUDA pin and only install Python deps + `flash-attn`. If `flash-attn` fails to build, set `llama2-7b.flash_attention2` to `"false"` in `config/model_config.yaml`.
+If your cloud image already provides a recent PyTorch + CUDA (e.g. PyTorch 2.8 / CUDA 12.8), skip the conda CUDA pin and install only the Python deps.
+
+`pip install flash-attn --no-build-isolation` compiles from source and needs a full CUDA toolkit; images that ship only PyTorch's bundled CUDA runtime have no `nvcc` and the build fails immediately. Install the official prebuilt wheel instead, matching `cu12` / `torch<major.minor>` / `cxx11abi<TRUE|FALSE>` / `cp<pyver>` to your interpreter:
+
+```bash
+python -c "import torch; print(torch.__version__, torch._C._GLIBCXX_USE_CXX11_ABI)"
+# pick the matching asset from https://github.com/Dao-AILab/flash-attention/releases
+pip install --no-deps <flash_attn-...whl>
+```
+
+If you cannot install it at all, set `llama2-7b.flash_attention2` to `"false"` in `config/model_config.yaml` to fall back to SDPA. Both are exact attention, so metrics are unaffected.
 
 ## HuggingFace setup (required before running)
 

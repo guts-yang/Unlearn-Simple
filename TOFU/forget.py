@@ -153,9 +153,15 @@ def main(cfg):
 
     oracle_model = None
 
+    eval_checkpoint = cfg.get('eval_checkpoint', None)
+
     if path_found:
         print("Loading from checkpoint")
-        model = AutoModelForCausalLM.from_pretrained(cfg.model_path, use_flash_attention_2=model_cfg["flash_attention2"]=="true", torch_dtype=torch.bfloat16, trust_remote_code = True)
+        # Oracle always stays on the original fine-tuned weights (model_path).
+        # When eval_checkpoint is set, load the unlearned weights into `model` only.
+        model_load_path = eval_checkpoint if eval_checkpoint else cfg.model_path
+        print(f"Loading model weights from: {model_load_path}")
+        model = AutoModelForCausalLM.from_pretrained(model_load_path, use_flash_attention_2=model_cfg["flash_attention2"]=="true", torch_dtype=torch.bfloat16, trust_remote_code = True)
         oracle_model = AutoModelForCausalLM.from_pretrained(cfg.model_path, use_flash_attention_2=model_cfg["flash_attention2"]=="true", torch_dtype=torch.bfloat16, trust_remote_code = True)
 
     else:
@@ -217,20 +223,32 @@ def main(cfg):
         KL_coeff=cfg.KL_coeff,
     )
     model.config.use_cache = False  # silence the warnings. Please re-enable for inference!
-    trainer.train()
-    trainer.evaluate()
+    if eval_checkpoint:
+        step = 0
+        name = Path(eval_checkpoint).name
+        if name.startswith("checkpoint-"):
+            try:
+                step = int(name.split("-")[-1])
+            except ValueError:
+                step = 0
+        trainer.state.global_step = step
+        print(f"Eval-only mode on {eval_checkpoint} (global_step={step})")
+        trainer.evaluate()
+    else:
+        trainer.train()
+        trainer.evaluate()
 
-    #save the tokenizer
-    model.save_pretrained(cfg.save_dir)
-    tokenizer.save_pretrained(cfg.save_dir)
+        #save the tokenizer
+        model.save_pretrained(cfg.save_dir)
+        tokenizer.save_pretrained(cfg.save_dir)
 
-    #delete all "global_step*" files in the save_dir/checkpoint-*/ directories
-    if local_rank == 0:
-        for file in Path(cfg.save_dir).glob("checkpoint-*"):
-            for global_step_dir in file.glob("global_step*"):
-                #delete the directory
-                import shutil
-                shutil.rmtree(global_step_dir)
+        #delete all "global_step*" files in the save_dir/checkpoint-*/ directories
+        if local_rank == 0:
+            for file in Path(cfg.save_dir).glob("checkpoint-*"):
+                for global_step_dir in file.glob("global_step*"):
+                    #delete the directory
+                    import shutil
+                    shutil.rmtree(global_step_dir)
 
 
 

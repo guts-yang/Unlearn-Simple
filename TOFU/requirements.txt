@@ -1,4 +1,11 @@
-git+https://github.com/huggingface/transformers
+# Pinned to the versions verified on 2xA800. transformers main is v5, which dropped
+# `from transformers import AdamW` (used by synthetic/) and needs huggingface_hub>=1.0,
+# while transformers 4.x requires huggingface_hub<1.0 -- do not `pip install -U` the hub.
+#
+# flash-attn is deliberately NOT listed: pip would build it from source, which needs a
+# full CUDA toolkit. Install the prebuilt wheel separately -- see TOFU/README.md.
+transformers==4.46.3
+huggingface_hub[cli]>=0.34,<1.0
 datasets
 accelerate
 deepspeed

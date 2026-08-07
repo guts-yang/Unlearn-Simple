@@ -32,6 +32,9 @@ weight_decay: 0.01
 seed: 1001
 run_index: 1
 overwrite_dir: false
+# If set, skip training and only evaluate this unlearned checkpoint
+# (oracle / retain KL still uses model_path = original ft weights).
+eval_checkpoint: null
 eval_steps: steps_per_epoch
 warmup_steps: steps_per_epoch
 

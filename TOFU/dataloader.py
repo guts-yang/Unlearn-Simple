@@ -26,7 +26,9 @@ import tqdm
 
 
 class CustomTrainer(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False):
+    # num_items_in_batch is passed by transformers>=4.46; these trainers do their own
+    # loss reduction, so it is accepted and ignored.
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         input_ids, labels, attention_mask = inputs
         outputs = model(input_ids,labels=labels, attention_mask=attention_mask)
         loss = outputs.loss
@@ -145,7 +147,7 @@ class CustomTrainerForgetting(Trainer):
 
         return model
     
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if self.loss_type == "grad_ascent":
             forget_inputs, retain_inputs = inputs
             input_ids, labels, attention_mask = forget_inputs
@@ -614,7 +616,7 @@ class CustomTrainerRetraining(Trainer):
             dataloader_params["worker_init_fn"] = seed_worker
         return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         input_ids, labels, attention_mask = inputs
         outputs = model(input_ids,labels=labels, attention_mask=attention_mask)
         loss = outputs.loss

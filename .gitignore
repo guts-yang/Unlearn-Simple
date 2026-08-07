@@ -8,7 +8,7 @@ synthetic/figures/
 
 TOFU/commands/
 TOFU/outputs/
-TOFU/results/
+# TOFU/results/
 TOFU/paper_models/
 TOFU/retrained_models/
 TOFU/__pycache__/
