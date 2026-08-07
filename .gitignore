@@ -23,7 +23,7 @@ TOFU/aggregated*
 TOFU/run.py
 
 muse/
-muse/baselines/ckpt
+muse/baselines/ckpt 
 muse/__pycache__/
 muse/baselines/baselines/__pycache__/
 muse/metrics/__pycache__/
