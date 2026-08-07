@@ -1,5 +1,9 @@
 .DS_Store
 
+synthetic/data/
+synthetic/models/
+synthetic/record/
+
 
 TOFU/commands/
 TOFU/outputs/
