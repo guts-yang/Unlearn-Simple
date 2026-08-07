@@ -3,6 +3,7 @@
 synthetic/data/
 synthetic/models/
 synthetic/record/
+synthetic/figures/
 
 
 TOFU/commands/
@@ -22,15 +23,18 @@ TOFU/json/
 TOFU/aggregated*
 TOFU/run.py
 
-muse/
-muse/baselines/ckpt 
-muse/__pycache__/
-muse/baselines/baselines/__pycache__/
-muse/metrics/__pycache__/
-muse/temp/
-muse/data/
+# No trailing slash on data/ckpt: they are symlinks to the data disk, and git
+# treats a symlink as a file, so "MUSE/data/" would not match it.
+MUSE/data
+MUSE/baselines/ckpt
+MUSE/__pycache__/
+MUSE/baselines/baselines/__pycache__/
+MUSE/metrics/__pycache__/
+MUSE/temp/
+MUSE/out_*.csv
 
 WMDP/files
+WMDP/.cache
 
 plot/
 plot/figures/

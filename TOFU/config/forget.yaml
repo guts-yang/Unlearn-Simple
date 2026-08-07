@@ -1,8 +1,10 @@
 model_family: llama2-7b
-# Download origin weights first, e.g.:
-#   huggingface-cli download locuslab/tofu_ft_llama2-7b --local-dir /data/models/tofu_ft_llama2-7b
+# Download origin weights into the data-disk HF cache first:
+#   source /root/autodl-tmp/env_hf.sh && hf download locuslab/tofu_ft_llama2-7b
 # Do not set a HuggingFace repo id here: forget.py uses os.listdir(model_path).
-model_path: /data/models/tofu_ft_llama2-7b
+# The cache snapshot dir is a valid local dir; re-read the hash after re-downloading:
+#   ls -d $HF_HOME/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/*/
+model_path: /root/autodl-tmp/huggingface/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/8fa500e8f345f1dd9cfe95bb4689878c944c9cbd
 
 LoRA:
   r: 0
@@ -33,7 +35,9 @@ overwrite_dir: false
 eval_steps: steps_per_epoch
 warmup_steps: steps_per_epoch
 
-save_dir: ${model_path}/unlearned/2GPU_${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
+# Data disk (system disk is only 30GB). Must NOT be under model_path: that would
+# write checkpoints into the HuggingFace cache snapshot.
+save_dir: /root/autodl-tmp/TOFU_results/2GPU_${forget_loss}_${lr}_${split}_epoch${num_epochs}_batch${batch_size}_accum${gradient_accumulation_steps}_beta${beta}_gamma${gamma}_grad_diff_coeff${grad_diff_coeff}_ref${ref_policy}_eval${eval_steps}_seed${seed}_${run_index}
 
 eval:
   retain_result: data/${..retain_set}_llama_wd0.01/eval_results/ds_size300/eval_log_aggregated.json

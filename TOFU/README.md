@@ -27,18 +27,26 @@ Unlearning loads two resources:
 
 ```bash
 pip install -U "huggingface_hub[cli]"
-# Prefer the data disk — system disks are often ~30GB
-export HF_HOME=/data/hf_cache
-export HUGGINGFACE_HUB_CACHE=$HF_HOME
-huggingface-cli login   # paste a Read token
+# Everything goes to the data disk — the system disk is only ~30GB.
+# HUGGINGFACE_HUB_CACHE must be $HF_HOME/hub, or the existing cache is bypassed.
+export HF_ENDPOINT=https://hf-mirror.com     # required where huggingface.co is unreachable
+export HF_HOME=/root/autodl-tmp/huggingface
+export HUGGINGFACE_HUB_CACHE=$HF_HOME/hub
+hf auth login   # paste a Read token (the repo root .env has one)
 
-huggingface-cli download locuslab/tofu_ft_llama2-7b \
-  --local-dir /data/models/tofu_ft_llama2-7b
-huggingface-cli download NousResearch/Llama-2-7b-chat-hf \
-  --local-dir /data/models/Llama-2-7b-chat-hf
+hf download locuslab/tofu_ft_llama2-7b
+hf download NousResearch/Llama-2-7b-chat-hf
 ```
 
-Then set `model_path` in `config/forget.yaml` to `/data/models/tofu_ft_llama2-7b` (already the default in this repo). Optionally point `hf_key` in `config/model_config.yaml` to `/data/models/Llama-2-7b-chat-hf`.
+On this machine `source /root/autodl-tmp/env_hf.sh` sets all of the above (and reads the token from `.env`).
+
+No `--local-dir` needed: the cache snapshot directory is itself a valid local directory. Point `model_path` in `config/forget.yaml` at it (already the default in this repo):
+
+```bash
+ls -d $HF_HOME/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/*/
+```
+
+The snapshot hash changes when re-downloading, so re-read it after a fresh download.
 
 Alternative: download the author-provided origin model from [Google Drive](https://drive.google.com/drive/folders/1L47Hf813gal8RD581S3XrWHnY_0ll4y4?usp=sharing) into a local folder and set `model_path` accordingly.
 
@@ -51,13 +59,13 @@ This repo defaults to **2 GPUs** with `gradient_accumulation_steps=16` → globa
 ## Get and evaluate the unlearned model
 
 * Confirm `model_path` in `config/forget.yaml` points to the local origin model directory.
-* Optionally edit `save_dir` for where checkpoints are written.
+* `save_dir` defaults to `/root/autodl-tmp/TOFU_results/2GPU_<hparams>`. Keep it on the data disk, and do **not** put it under `model_path` — that writes checkpoints into the HuggingFace cache.
 
 One-shot (recommended):
 
 ```bash
 cd TOFU
-export HF_HOME=/data/hf_cache
+source /root/autodl-tmp/env_hf.sh
 bash run_simnpo.sh
 ```
 
@@ -65,7 +73,7 @@ Or manually:
 
 ```bash
 export master_port=29500
-export HF_HOME=/data/hf_cache
+source /root/autodl-tmp/env_hf.sh
 
 # forget05
 CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=$master_port \
@@ -76,4 +84,4 @@ CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=$master_port 
   forget.py --config-name=forget.yaml split=forget10 npo_coeff=0.125 beta=4.5
 ```
 
-* Results are written to `${save_dir}/checkpoint/aggregate_stat.txt`.
+* Results are written to `/root/autodl-tmp/TOFU_results/2GPU_<hparams>/checkpoint*/aggregate_stat.txt`.

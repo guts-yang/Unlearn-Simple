@@ -2,7 +2,7 @@
     "overall": {
         "model_name": "HuggingFaceH4/zephyr-7b-beta",
         "logger": "json",
-        "cache_dir": "./.cache",
+        "cache_dir": "/root/autodl-tmp/WMDP_cache",
         "seed": 1
     },
     "unlearn": {
@@ -31,7 +31,7 @@
     },
     "logger": {
         "json": {
-            "root": "files/results/unlearn_wmdp_bio/Relearn+Forget"
+            "root": "/root/autodl-tmp/WMDP_files/results/unlearn_wmdp_bio/Relearn+Forget"
         }
     }
 }
