@@ -1,0 +1,29 @@
+run: 2026-08-07 afternoon train + 2026-08-08 morning eval-only
+ckpt: /root/autodl-tmp/TOFU_results/2GPU_simnpo_grad_diff_1e-05_forget05_epoch10_batch1_accum16_beta2.5_gamma0.0_grad_diff_coeff1.0_reffine_tuned_evalsteps_per_epoch_seed1001_1/checkpoint-62
+hparams: 2GPU accum16 lr1e-5 beta2.5 npo_coeff0.1375 seed1001 simnpo_grad_diff forget05
+train_loss: 0.03644514083862305  steps: 62/62
+eval_log: /root/autodl-tmp/logs/tofu_forget05_evalonly_20260808_091749.log
+
+Real Authors ROUGE: 0.8573333333333332
+Real Authors Probability: 0.49419156434231587
+Real Authors Truth Ratio: 0.6474169798761951
+Real Authors KL Divergence: 0.020373077392578126
+Real World ROUGE: 0.8803418803418803
+Real World Probability: 0.43259148877489995
+Real World Truth Ratio: 0.569867702428191
+Real World KL Divergence: 0.00972702156784188
+Retain ROUGE: 0.5815824684811156
+Retain Probability: 0.797087090108307
+Retain Truth Ratio: 0.47444402696345267
+Retain KL Divergence: 0.09728790283203125
+Forget ROUGE: 0.40859182382330417
+Forget Probability: 0.0904712969984871
+Forget Truth Ratio: 0.5409691670007237
+Forget KL Divergence: 0.663509521484375
+Model Utility: 0.5992559622393867
+Forget Quality: 4.448673570292354e-08
+KS Test PVal Forget: 4.448673570292354e-08
+KS Test Forget: 0.29500000000000004
+curr_step: 62
+seed: 1001
+loss_type: simnpo_grad_diff
