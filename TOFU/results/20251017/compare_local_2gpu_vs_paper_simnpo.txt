@@ -1,0 +1,18 @@
+Comparison: local 2GPU forget05 (2026-08-07/08) vs paper Table 1 SimNPO
+
+Metric                        | Paper SimNPO | Local 2GPU ckpt-62 | Note
+------------------------------|-------------|--------------------|------
+Model Utility (MU)↑           | 0.58        | 0.599              | local MU is close / slightly higher
+Forget Quality (FQ)↑          | 0.99        | 4.45e-8            | local FQ collapsed (GA/GradDiff-like regime)
+Forget ROUGE (lower=forget)   | 0.26        | 0.409              | paper forgets more on generation
+Forget Probability            | 0.03        | 0.090              | paper forgets more on likelihood
+Forget Truth Ratio            | 0.69        | 0.541              | different scale/folding; FQ uses raw R dist.
+Real Authors ROUGE            | 0.90        | 0.857              |
+Real World ROUGE              | 0.90        | 0.880              |
+Retain ROUGE                  | 0.54        | 0.582              |
+Retain Probability            | 0.56        | 0.797              | local retain Prob much higher than paper
+
+Local source:
+  TOFU/results/20260807/2GPU_forget05_summary.txt
+Paper source:
+  table1_forget05_simnpo_as_aggregate_stat.txt

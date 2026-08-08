@@ -1,0 +1,35 @@
+Paper: Simplicity Prevails: Rethinking Negative Preference Optimization for LLM Unlearning
+Table 2 — MUSE News (LLaMA2-7B) & MUSE Books (ICLM-7B)
+Source PDF page ~9 (main text Table 2)
+
+Metric directions:
+  VerbMem Df (↓)   — verbatim memorization on forget set; lower better
+  KnowMem Df (↓)   — knowledge memorization on forget set; lower better
+  PrivLeak (→0)    — privacy leakage; closer to 0 better (Retrain = 0)
+  KnowMem Dr (↑)   — knowledge memorization on retain set; higher better
+
+==================== MUSE News ====================
+Method      | VerbMem Df↓ | KnowMem Df↓ | PrivLeak→0 | KnowMem Dr↑
+------------+-------------+-------------+------------+-------------
+Original    | 58.29       | 62.93       | -98.71     | 54.31
+Retrain     | 20.75       | 33.32       | 0.00       | 53.79
+GA          | 0.00        | 0.00        | 20.14      | 0.00
+GradDiff    | 4.85        | 31.29       | 108.12     | 28.21
+Task Vector | 77.42       | 58.76       | -100.00    | 47.94
+NPO         | 2.53        | 56.93       | 108.91     | 37.58
+SimNPO      | 2.34        | 44.84       | 72.93      | 39.65
+
+==================== MUSE Books ====================
+Method      | VerbMem Df↓ | KnowMem Df↓ | PrivLeak→0 | KnowMem Dr↑
+------------+-------------+-------------+------------+-------------
+Original    | 99.56       | 58.32       | -56.32     | 67.01
+Retrain     | 14.30       | 28.90       | 0.00       | 74.50
+GA          | 0.00        | 0.00        | -24.07     | 0.00
+GradDiff    | 0.00        | 0.00        | -24.59     | 0.13
+Task Vector | 99.31       | 35.55       | -83.78     | 62.55
+NPO         | 0.00        | 0.00        | -31.17     | 23.71
+SimNPO      | 0.00        | 0.00        | -19.82     | 48.27
+
+SimNPO targets:
+  News  — VerbMem=2.34, KnowMem_f=44.84, PrivLeak=72.93, KnowMem_r=39.65
+  Books — VerbMem=0.00, KnowMem_f=0.00, PrivLeak=-19.82, KnowMem_r=48.27

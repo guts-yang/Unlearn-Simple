@@ -1,0 +1,19 @@
+Paper: Simplicity Prevails: Rethinking Negative Preference Optimization for LLM Unlearning
+Table 1 — TOFU Forget05, LLaMA2-7B-chat (averaged over 5 trials)
+Source PDF page ~9 (main text Table 1)
+
+Unlearning Efficacy                          | Utility Preservation
+Method   | Forget Set                         | FQ     | Real Authors      | World Facts       | Retain Set        | MU
+         | (1-R-L)↑ (1-Prob)↑ Truth↑           |        | R-L  Prob  Truth  | R-L  Prob  Truth  | R-L  Prob  Truth  |
+---------+-------------------------------------+--------+-------------------+-------------------+-------------------+-----
+Original | 0.04     0.01      0.49            | 0.00   | 0.93 0.44  0.58   | 0.91 0.43  0.55   | 0.98 0.99  0.48   | 0.62
+Retrain  | 0.61     0.85      0.66            | 1.00   | 0.92 0.44  0.57   | 0.90 0.43  0.54   | 0.97 0.99  0.48   | 0.62
+GA       | 1.00     1.00      0.66            | 1.9e-9 | 0.00 0.20  0.40   | 0.00 0.30  0.28   | 0.00 0.00  0.15   | 0.00
+GradDiff | 1.00     1.00      0.60            | 3.6e-9 | 0.59 0.59  0.81   | 0.88 0.46  0.59   | 0.42 0.49  0.48   | 0.56
+IDK      | 0.98     0.40      0.55            | 1.9e-9 | 0.65 0.48  0.63   | 0.82 0.44  0.55   | 0.55 0.86  0.43   | 0.57
+RKLD     | 0.69     0.96      0.66            | 0.79   | 0.92 0.47  0.61   | 0.87 0.47  0.58   | 0.58 0.52  0.43   | 0.56
+NPO      | 0.73     0.94      0.67            | 0.79   | 0.91 0.50  0.62   | 0.90 0.50  0.61   | 0.47 0.51  0.44   | 0.57
+SimNPO   | 0.74     0.97      0.69            | 0.99   | 0.90 0.50  0.64   | 0.90 0.48  0.60   | 0.54 0.56  0.44   | 0.58
+
+Primary targets (SimNPO): FQ=0.99, MU=0.58
+Gold standard (Retrain):  FQ=1.00, MU=0.62

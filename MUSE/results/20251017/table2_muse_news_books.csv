@@ -1,0 +1,15 @@
+dataset,method,verbmem_df,knowmem_df,privleak,knowmem_dr
+MUSE_News,Original,58.29,62.93,-98.71,54.31
+MUSE_News,Retrain,20.75,33.32,0.00,53.79
+MUSE_News,GA,0.00,0.00,20.14,0.00
+MUSE_News,GradDiff,4.85,31.29,108.12,28.21
+MUSE_News,TaskVector,77.42,58.76,-100.00,47.94
+MUSE_News,NPO,2.53,56.93,108.91,37.58
+MUSE_News,SimNPO,2.34,44.84,72.93,39.65
+MUSE_Books,Original,99.56,58.32,-56.32,67.01
+MUSE_Books,Retrain,14.30,28.90,0.00,74.50
+MUSE_Books,GA,0.00,0.00,-24.07,0.00
+MUSE_Books,GradDiff,0.00,0.00,-24.59,0.13
+MUSE_Books,TaskVector,99.31,35.55,-83.78,62.55
+MUSE_Books,NPO,0.00,0.00,-31.17,23.71
+MUSE_Books,SimNPO,0.00,0.00,-19.82,48.27

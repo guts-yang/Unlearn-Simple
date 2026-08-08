@@ -85,13 +85,15 @@ Or manually:
 export master_port=29500
 source /root/autodl-tmp/env_hf.sh
 
+# Paper eq (1): L = L_SimNPO + λ * L_CE(D_r) → npo_coeff=1.0, grad_diff_coeff=λ
 # forget05
 CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=$master_port \
-  forget.py --config-name=forget.yaml split=forget05 npo_coeff=0.1375 beta=2.5
+  forget.py --config-name=forget.yaml split=forget05 npo_coeff=1.0 grad_diff_coeff=0.1375 beta=2.5
 
 # forget10
 CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=$master_port \
-  forget.py --config-name=forget.yaml split=forget10 npo_coeff=0.125 beta=4.5
+  forget.py --config-name=forget.yaml split=forget10 retain_set=retain90 \
+  npo_coeff=1.0 grad_diff_coeff=0.125 beta=4.5
 ```
 
 * Results are written to `/root/autodl-tmp/TOFU_results/2GPU_<hparams>/checkpoint*/aggregate_stat.txt`.

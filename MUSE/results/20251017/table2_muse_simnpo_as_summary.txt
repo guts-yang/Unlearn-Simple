@@ -1,0 +1,27 @@
+# Paper Table 2 SimNPO rows, keyed like MUSE eval summary fields.
+# Source: MUSE News (LLaMA2-7B), MUSE Books (ICLM-7B).
+
+[MUSE_News / SimNPO]
+verbmem_f: 2.34
+knowmem_f: 44.84
+privleak: 72.93
+knowmem_r: 39.65
+
+[MUSE_Books / SimNPO]
+verbmem_f: 0.00
+knowmem_f: 0.00
+privleak: -19.82
+knowmem_r: 48.27
+
+# Gold standard (Retrain) for reference
+[MUSE_News / Retrain]
+verbmem_f: 20.75
+knowmem_f: 33.32
+privleak: 0.00
+knowmem_r: 53.79
+
+[MUSE_Books / Retrain]
+verbmem_f: 14.30
+knowmem_f: 28.90
+privleak: 0.00
+knowmem_r: 74.50

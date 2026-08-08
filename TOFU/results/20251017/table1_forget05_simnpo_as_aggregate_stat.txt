@@ -1,0 +1,19 @@
+# Converted from paper Table 1 SimNPO row to this repo's aggregate_stat field names.
+# Forget ROUGE/Probability = 1 - paper's (1-Rouge-L)/(1-Prob.).
+# Paper does not report KL Divergence; those fields are omitted.
+# Source: TOFU Forget05, LLaMA2-7B-chat, 5-trial average.
+
+Real Authors ROUGE: 0.90
+Real Authors Probability: 0.50
+Real Authors Truth Ratio: 0.64
+Real World ROUGE: 0.90
+Real World Probability: 0.48
+Real World Truth Ratio: 0.60
+Retain ROUGE: 0.54
+Retain Probability: 0.56
+Retain Truth Ratio: 0.44
+Forget ROUGE: 0.26
+Forget Probability: 0.03
+Forget Truth Ratio: 0.69
+Model Utility: 0.58
+Forget Quality: 0.99
