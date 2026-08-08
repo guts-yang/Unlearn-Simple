@@ -28,19 +28,21 @@ export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME/hub}"
 
 NPROC="${NPROC:-2}"
 
+# Paper eq (1): L = L_SimNPO + λ * L_CE(D_r) → npo_coeff=1.0, grad_diff_coeff=λ
 case "$SPLIT" in
-  forget05) NPO_COEFF=0.1375; BETA=2.5 ;;
-  forget10) NPO_COEFF=0.125;  BETA=4.5 ;;
+  forget05) GRAD_DIFF_COEFF=0.1375; BETA=2.5; RETAIN_SET=retain95 ;;
+  forget10) GRAD_DIFF_COEFF=0.125;  BETA=4.5; RETAIN_SET=retain90 ;;
   *) echo "Unsupported split: $SPLIT (use forget05 or forget10)"; exit 1 ;;
 esac
 
-echo "split=${SPLIT} npo_coeff=${NPO_COEFF} beta=${BETA}"
+echo "split=${SPLIT} npo_coeff=1.0 grad_diff_coeff=${GRAD_DIFF_COEFF} beta=${BETA} retain_set=${RETAIN_SET}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} nproc_per_node=${NPROC}"
 echo "HF_HOME=${HF_HOME} master_port=${master_port}"
 
 echo "=== Running SimNPO ${SPLIT} ==="
 torchrun --nproc_per_node="${NPROC}" --master_port="${master_port}" \
   forget.py --config-name=forget.yaml \
-  split="${SPLIT}" npo_coeff="${NPO_COEFF}" beta="${BETA}"
+  split="${SPLIT}" retain_set="${RETAIN_SET}" \
+  npo_coeff=1.0 grad_diff_coeff="${GRAD_DIFF_COEFF}" beta="${BETA}"
 
 echo "Done ${SPLIT}. Check aggregate_stat.txt under /root/autodl-tmp/TOFU_results/2GPU_*/checkpoint*/."
