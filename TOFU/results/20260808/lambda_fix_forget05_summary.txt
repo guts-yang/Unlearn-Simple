@@ -1,0 +1,40 @@
+run: 2026-08-08 lambda-fix retrain (npo_coeff=1.0, grad_diff_coeff=0.1375)
+ckpt: /root/autodl-tmp/TOFU_results/2GPU_simnpo_grad_diff_1e-05_forget05_epoch10_batch1_accum16_beta2.5_gamma0.0_grad_diff_coeff0.1375_reffine_tuned_evalsteps_per_epoch_seed1001_1/checkpoint-62
+hparams: 2GPU accum16 lr1e-5 beta2.5 npo_coeff=1.0 grad_diff_coeff=0.1375 seed1001 simnpo_grad_diff forget05
+paper eq(1): L = L_SimNPO + λ * L_CE(D_r), λ=0.1375
+log: /root/autodl-tmp/logs/tofu_forget05_lambda_fix_20260808_104247.log
+
+Real Authors ROUGE: 0.7921666666666667
+Real Authors Probability: 0.40954710469775596
+Real Authors Truth Ratio: 0.5454788158656558
+Real Authors KL Divergence: 0.0353204345703125
+Real World ROUGE: 0.8774928774928774
+Real World Probability: 0.4437828656917236
+Real World Truth Ratio: 0.5551836865428612
+Real World KL Divergence: 0.019969190287793804
+Retain ROUGE: 0.5226806452408103
+Retain Probability: 0.7442630311742117
+Retain Truth Ratio: 0.4709150503964156
+Retain KL Divergence: 0.10905232747395834
+Forget ROUGE: 0.2853514966240547
+Forget Probability: 0.01007226933288154
+Forget Truth Ratio: 0.6325801022706741
+Forget KL Divergence: 1.586845703125
+Model Utility: 0.5585949108738131
+Forget Quality: 0.0009668691315127085
+KS Test PVal Forget: 0.0009668691315127085
+KS Test Forget: 0.195
+curr_step: 62
+seed: 1001
+loss_type: simnpo_grad_diff
+
+==== 对照 ====
+Metric            | Paper SimNPO | 旧λ在forget (1.0) | 新λ在retain (0.1375)
+------------------|-------------:|------------------:|--------------------:
+MU↑               | 0.58         | 0.599             | 0.559
+FQ↑               | 0.99         | 4.45e-8           | 9.67e-4
+Forget ROUGE↓     | 0.26         | 0.409             | 0.285
+Forget Prob↓      | 0.03         | 0.090             | 0.010
+Retain Prob       | 0.56         | 0.797             | 0.744
+
+解读：λ 放到 retain 后遗忘明显加强（Forget ROUGE/Prob 接近甚至强于论文），FQ 从 1e-8 升到 ~1e-3（约 2 万倍），但仍远低于论文 0.99；MU 略降，仍接近论文 0.58。
