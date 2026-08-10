@@ -1,0 +1,33 @@
+# Official OPTML SimNPO-TOFU-forget05 · local eval-only (20260810)
+
+Checkpoint: OPTML-Group/SimNPO-TOFU-forget05-Llama-2-7b-chat
+  snapshot: 40b7c15ba910aa6c486cf4ebd2f46ad916c1a04b
+Origin (oracle): OPTML-Group/TOFU-origin-Llama-2-7b-chat
+  snapshot: 788620ac9df8128c06e2464e1c65d19aeea71b25
+Protocol: forget.py eval_checkpoint=... (evaluation_strategy=no, final eval only)
+GPUs: 2x A800, eval.batch_size=8, ds_size=300
+retain_result: data/retain95_llama_wd0.01/.../eval_log_aggregated.json
+Log: /root/autodl-tmp/logs/tofu_official_eval_20260810_142422.log
+Out: /root/autodl-tmp/TOFU_results/official_eval_SimNPO_forget05/checkpoint-0/aggregate_stat.txt
+
+Model Utility: 0.581197376100517
+Forget Quality: 0.7933622419382523
+Forget ROUGE: 0.25693866175619745
+Forget Probability: 0.027101270540788674
+Forget Truth Ratio: 0.6611339621464063
+Retain ROUGE: 0.5277411540981484
+Retain Probability: 0.5634462811733291
+Real Authors ROUGE: 0.8633333333333333
+Real World ROUGE: 0.8903133903133902
+
+==== 对照 ====
+Metric            | Paper SimNPO | Official ckpt local eval
+------------------|-------------:|------------------------:
+MU↑               | 0.58         | 0.581
+FQ↑               | 0.99         | 0.793
+Forget ROUGE↓     | 0.26         | 0.257
+Forget Prob↓      | 0.03         | 0.027
+Retain Prob       | 0.56         | 0.563
+
+解读：本地评测管线可复现论文量级（MU/Forget ROUGE/Prob 几乎贴合）。
+FQ 为单次 KS p 值，相对论文 5 次平均的 0.99 有抖动，但仍为 O(1)，远高于此前本地训练的 ~1e-3。

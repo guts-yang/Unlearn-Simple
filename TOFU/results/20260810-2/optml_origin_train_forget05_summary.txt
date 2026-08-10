@@ -1,0 +1,46 @@
+# OPTML origin → local SimNPO train · forget05 (20260810-2)
+
+Origin: OPTML-Group/TOFU-origin-Llama-2-7b-chat
+  snapshot: 788620ac9df8128c06e2464e1c65d19aeea71b25
+hparams: 2GPU accum16 lr1e-5 beta2.5 npo_coeff=1.0 grad_diff_coeff=0.1375 gamma=0.0 seed1001 run_index=2
+paper eq(1): L = L_SimNPO + λ * L_CE(D_r), λ=0.1375 on retain
+Protocol: forget.py train + final evaluate (eval_checkpoint=null)
+Log: /root/autodl-tmp/logs/tofu_train_official_origin_20260810_155026.log
+Out: /root/autodl-tmp/TOFU_results/2GPU_simnpo_grad_diff_1e-05_forget05_epoch10_batch1_accum16_beta2.5_gamma0.0_grad_diff_coeff0.1375_reffine_tuned_evalsteps_per_epoch_seed1001_2/checkpoint-62
+train_loss: 0.11280199020139632  (62/62 steps, ~1h01)
+
+Real Authors ROUGE: 0.9225
+Real Authors Probability: 0.4671525681216473
+Real Authors Truth Ratio: 0.5971236324334787
+Real Authors KL Divergence: 0.0380255126953125
+Real World ROUGE: 0.8732193732193733
+Real World Probability: 0.47208610484483027
+Real World Truth Ratio: 0.5905501192409727
+Real World KL Divergence: 0.015472933777377136
+Retain ROUGE: 0.6080175932972994
+Retain Probability: 0.8220705253964424
+Retain Truth Ratio: 0.47734645074533943
+Retain KL Divergence: 0.08047281901041667
+Forget ROUGE: 0.2521806640275686
+Forget Probability: 0.01681191027593353
+Forget Truth Ratio: 0.6366720403465264
+Forget KL Divergence: 1.339697265625
+Model Utility: 0.6076088751207325
+Forget Quality: 0.0297148244707607
+KS Test PVal Forget: 0.0297148244707607
+KS Test Forget: 0.14500000000000002
+curr_step: 62
+seed: 1001
+loss_type: simnpo_grad_diff
+
+==== 对照 ====
+Metric            | Paper SimNPO | Official ckpt local eval | This train (OPTML origin)
+------------------|-------------:|------------------------:|-------------------------:
+MU↑               | 0.58         | 0.581                   | 0.608
+FQ↑               | 0.99         | 0.793                   | 0.030
+Forget ROUGE↓     | 0.26         | 0.257                   | 0.252
+Forget Prob↓      | 0.03         | 0.027                   | 0.017
+Retain Prob       | 0.56         | 0.563                   | 0.822
+
+解读：遗忘 ROUGE/Prob 已接近甚至强于论文与官方成品；MU 略高。
+FQ（KS p）仅 0.030，远低于官方成品本地评 0.793 / 论文 0.99——说明同超参下本地训练仍未复现官方权重的 Forget Quality 分布。
