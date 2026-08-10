@@ -9,7 +9,7 @@
 #
 # Prerequisites:
 #   1. source /root/autodl-tmp/env_hf.sh (HF mirror + data-disk cache + token)
-#   2. forget.yaml model_path points to the local origin model directory
+#   2. forget.yaml model_path = local OPTML-Group/TOFU-origin-Llama-2-7b-chat snapshot
 #   3. Run from the TOFU/ directory
 
 set -euo pipefail

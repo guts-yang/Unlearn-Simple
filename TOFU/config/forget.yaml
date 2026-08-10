@@ -1,10 +1,10 @@
 model_family: llama2-7b
-# Download origin weights into the data-disk HF cache first:
-#   source /root/autodl-tmp/env_hf.sh && hf download locuslab/tofu_ft_llama2-7b
+# Official OPTML origin (paper collection). Download to data-disk HF cache first:
+#   source /root/autodl-tmp/env_hf.sh && hf download OPTML-Group/TOFU-origin-Llama-2-7b-chat
 # Do not set a HuggingFace repo id here: forget.py uses os.listdir(model_path).
-# The cache snapshot dir is a valid local dir; re-read the hash after re-downloading:
-#   ls -d $HF_HOME/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/*/
-model_path: /root/autodl-tmp/huggingface/hub/models--locuslab--tofu_ft_llama2-7b/snapshots/8fa500e8f345f1dd9cfe95bb4689878c944c9cbd
+# Re-read the hash after re-downloading:
+#   ls -d $HF_HOME/hub/models--OPTML-Group--TOFU-origin-Llama-2-7b-chat/snapshots/*/
+model_path: /root/autodl-tmp/huggingface/hub/models--OPTML-Group--TOFU-origin-Llama-2-7b-chat/snapshots/788620ac9df8128c06e2464e1c65d19aeea71b25
 
 LoRA:
   r: 0
