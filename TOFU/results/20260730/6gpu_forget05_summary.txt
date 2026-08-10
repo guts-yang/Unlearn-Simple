@@ -22,3 +22,14 @@ KS Test Forget: 0.2700000000000001
 curr_step: 55
 seed: 1001
 loss_type: simnpo_grad_diff
+
+==== 对照 ====
+Metric            | Paper SimNPO | 本跑 6GPU (λ在forget)
+------------------|-------------:|----------------------:
+MU↑               | 0.58         | 0.603
+FQ↑               | 0.99         | 8.06e-7
+Forget ROUGE↓     | 0.26         | 0.368
+Forget Prob↓      | 0.03         | 0.087
+Retain Prob       | 0.56         | 0.823
+
+解读：与后续 2GPU 旧配置同属「λ 在 forget」失败模式——欠遗忘、FQ≈0、MU 尚可。6 卡 accum6、checkpoint-55。
