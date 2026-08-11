@@ -35,11 +35,13 @@ def unlearn(
         tokenizer_dir=tokenizer_dir
     )
 
-    ref_model = (
-        load_model(model_dir)
-        if 'npo' in loss_type or 'kl' in loss_type
-        else None
+    # simnpo does not use a reference model; only classic npo / kl do.
+    # ('npo' in 'simnpo_gdr') is True, so exclude simnpo explicitly.
+    need_ref = (
+        ('kl' in loss_type)
+        or ('npo' in loss_type and 'simnpo' not in loss_type)
     )
+    ref_model = load_model(model_dir) if need_ref else None
 
     dataset = ForgetRetainDataset(
         data_file,
@@ -56,10 +58,12 @@ def unlearn(
         per_device_train_batch_size=per_device_batch_size,
         learning_rate=learning_rate,
         save_strategy='epoch',  # Save every epoch
+        save_total_limit=2,     # Paper uses epoch 10; keep disk under control
         num_train_epochs=epochs,
         optim='adamw_torch',
         lr_scheduler_type='constant',
         bf16=True,
+        gradient_checkpointing=True,  # needed for seq=2048 + gdr on 2x80GB
         report_to='none'        # Disable wandb
     )
 
@@ -111,7 +115,8 @@ class IterativeUnlearner(Trainer):
         super().__init__(*args, **kwargs)
 
 
-    def compute_loss(self, model, x, return_outputs=False):
+    # num_items_in_batch is passed by transformers>=4.46; this trainer does its own loss.
+    def compute_loss(self, model, x, return_outputs=False, num_items_in_batch=None):
         """Source: https://github.com/licong-lin/negative-preference-optimization/blob/main/synthetic/mymodel.py
         """
         
@@ -132,7 +137,7 @@ class IterativeUnlearner(Trainer):
             )
             loss_r = outputs_r.loss
 
-        if 'klf' in self.loss_type or 'npo' in self.loss_type:
+        if 'klf' in self.loss_type or ('npo' in self.loss_type and 'simnpo' not in self.loss_type):
             with torch.no_grad():
                 outputs_f_ref = self.ref_model(
                     x_f['input_ids'],

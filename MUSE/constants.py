@@ -2,7 +2,7 @@ SUPPORTED_METRICS = ['verbmem_f', 'privleak', 'knowmem_f', 'knowmem_r']
 
 CORPORA = ['news', 'books']
 
-LLAMA_DIR = "meta-llama/Llama-2-7b-hf"
+LLAMA_DIR = "NousResearch/Llama-2-7b-hf"
 
 DEFAULT_DATA = {
     'news': {

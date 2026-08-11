@@ -1,7 +1,7 @@
 import sys
 import pathlib
 BASELINE_PATH = pathlib.Path(__file__).parent.resolve()
-sys.path.append(BASELINE_PATH)
+sys.path.append(str(BASELINE_PATH))
 
 from baselines import it_unlearn, tv_unlearn, finetune
 
