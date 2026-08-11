@@ -1,0 +1,23 @@
+Real Authors ROUGE: 0.9165000000000001
+Real Authors Probability: 0.45855017988712354
+Real Authors Truth Ratio: 0.5825923313768032
+Real Authors KL Divergence: 0.046290283203125
+Real World ROUGE: 0.878917378917379
+Real World Probability: 0.44692529072628123
+Real World Truth Ratio: 0.5670600158356237
+Real World KL Divergence: 0.020822117471287392
+Retain ROUGE: 0.5892745199396866
+Retain Probability: 0.8303744674044328
+Retain Truth Ratio: 0.47485391872005683
+Retain KL Divergence: 0.08001953125
+Forget ROUGE: 0.18037484417840643
+Forget Probability: 0.03106886595154536
+Forget Truth Ratio: 0.7426739594033959
+Forget KL Divergence: 1.4580143229166667
+Model Utility: 0.5946755027570982
+Forget Quality: 0.00023624631733179933
+KS Test PVal Forget: 0.00023624631733179933
+KS Test Forget: 0.17333333333333334
+curr_step: 125
+seed: 1001
+loss_type: simnpo_grad_diff

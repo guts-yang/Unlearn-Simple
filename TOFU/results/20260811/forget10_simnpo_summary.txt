@@ -1,0 +1,32 @@
+# TOFU Forget10 · SimNPO local train+eval (20260811)
+
+Paper: Simplicity Prevails Table A3 (Forget10, LLaMA2-7B-chat)
+Origin: OPTML-Group/TOFU-origin-Llama-2-7b-chat snapshot 788620ac...
+hparams: 2GPU accum16 lr1e-5 beta=4.5 npo_coeff=1.0 grad_diff_coeff=0.125 (λ) retain90 seed1001
+Log: /root/autodl-tmp/logs/tofu_forget10_2gpu_20260811_154641.log
+aggregate_stat: /root/autodl-tmp/TOFU_results/2GPU_simnpo_grad_diff_1e-05_forget10_epoch10_batch1_accum16_beta4.5_gamma0.0_grad_diff_coeff0.125_reffine_tuned_evalsteps_per_epoch_seed1001_1/checkpoint-125/aggregate_stat.txt
+
+==== Metrics (local) ====
+Model Utility: 0.5946755027570982
+Forget Quality: 0.00023624631733179933
+Forget ROUGE: 0.18037484417840643
+Forget Probability: 0.03106886595154536
+Forget Truth Ratio: 0.7426739594033959
+Retain ROUGE: 0.5892745199396866
+Retain Probability: 0.8303744674044328
+Real Authors ROUGE: 0.9165000000000001
+Real World ROUGE: 0.878917378917379
+
+==== 对照 (Table A3 SimNPO) ====
+Metric                 |    Paper |     This run
+-----------------------+----------+-------------
+Model Utility          |     0.62 |       0.5947
+Forget Quality         |     0.45 |       0.0002
+Forget ROUGE           |     0.22 |       0.1804
+Forget Probability     |     0.09 |       0.0311
+Forget Truth Ratio     |     0.71 |       0.7427
+Retain ROUGE           |     0.54 |       0.5893
+Retain Probability     |     0.76 |       0.8304
+
+注：论文 Forget 侧为 (1-Rouge-L)/(1-Prob)；Paper 列已换算成与 aggregate_stat 同口径。
+FQ 论文为多次平均；本地为单次 seed=1001。
