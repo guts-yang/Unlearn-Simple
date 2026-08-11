@@ -1,0 +1,29 @@
+# MUSE Books · SimNPO+GDR local train+eval (20260811)
+
+Paper: Simplicity Prevails (Table 2 · MUSE Books)
+Corpus: books
+Algo: simnpo_gdr
+2xA800 device_map=auto max_len=2048 epochs=10 lr=1e-5 batch=4 beta=0.75 coeff=0.1 npo_coeff=1.0 save_only_model=True
+Ckpt: /root/autodl-tmp/MUSE_ckpt/books/simnpo_gdr
+Log train: see /root/autodl-tmp/logs/muse_books_simnpo_gdr_*.log
+Log eval: /root/autodl-tmp/logs/muse_books_eval_20260811_151831.log
+CSV: /usr/local/Unlearn-Simple/MUSE/results/20260811/out_books_simnpo_gdr.csv
+train_loss: 0.012985868676960896
+
+==== Metrics (local) ====
+verbmem_f: 0
+knowmem_f: 0
+privleak: -23.1967
+knowmem_r: 50.068
+
+==== 对照 (Table 2 SimNPO) ====
+Metric       | Dir |    Paper |  Retrain | This run | Δ vs paper
+-------------+-----+----------+----------+----------+-----------
+verbmem_f    |   ↓ |     0.00 |    14.30 |     0.00 |      +0.00
+knowmem_f    |   ↓ |     0.00 |    28.90 |     0.00 |      +0.00
+privleak     |  →0 |   -19.82 |     0.00 |   -23.20 |      -3.38
+knowmem_r    |   ↑ |    48.27 |    74.50 |    50.07 |      +1.80
+
+解读：
+- VerbMem/KnowMem_f：越低遗忘越强；KnowMem_r：越高效用越好；PrivLeak：越接近 0 越好（Retrain=0）。
+- 与论文同方法同设定对照；本机 2×A800、device_map=auto、save_total_limit=2、gradient_checkpointing。

@@ -1,0 +1,4 @@
+verbmem_f: 0.0
+privleak: -23.1967365102911
+knowmem_f: 0.0
+knowmem_r: 50.068009768009766

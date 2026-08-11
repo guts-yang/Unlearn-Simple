@@ -1,0 +1,15 @@
+# Paper Table A3 — TOFU Forget10 SimNPO (LLaMA2-7B-chat)
+# Source: Simplicity Prevails appendix I.3
+# Note: paper Forget columns are (1-Rouge-L) / (1-Prob); converted below to match aggregate_stat.
+
+Model Utility: 0.62
+Forget Quality: 0.45
+Forget ROUGE: 0.22
+Forget Probability: 0.09
+Forget Truth Ratio: 0.71
+Retain ROUGE: 0.54
+Retain Probability: 0.76
+Real Authors ROUGE: 0.90
+Real World ROUGE: 0.88
+
+hparams: beta=4.5, grad_diff_coeff(λ)=0.125, retain90
