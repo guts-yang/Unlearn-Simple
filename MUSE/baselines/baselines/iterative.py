@@ -59,6 +59,7 @@ def unlearn(
         learning_rate=learning_rate,
         save_strategy='epoch',  # Save every epoch
         save_total_limit=2,     # Paper uses epoch 10; keep disk under control
+        save_only_model=True,   # skip optimizer.pt (~26GB/ckpt); eval only needs weights
         num_train_epochs=epochs,
         optim='adamw_torch',
         lr_scheduler_type='constant',
